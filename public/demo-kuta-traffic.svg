@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-labelledby="title desc">
+  <title id="title">Frame ilustrasi kemacetan Kuta</title><desc id="desc">Ilustrasi terkontrol untuk demo evidence video, bukan tangkapan sumber asli.</desc>
+  <rect width="800" height="450" fill="#dce9e5"/><rect y="0" width="800" height="120" fill="#b9d9e3"/>
+  <path d="M0 450L275 145h250L800 450z" fill="#555e5c"/><path d="M390 155h20l-15 295h-35z" fill="#f3df55"/>
+  <g fill="#eff3f1" stroke="#344541" stroke-width="5"><rect x="210" y="250" width="130" height="70" rx="12"/><rect x="485" y="205" width="125" height="70" rx="12"/><rect x="330" y="325" width="155" height="80" rx="12"/></g>
+  <g fill="#263733"><circle cx="240" cy="322" r="16"/><circle cx="312" cy="322" r="16"/><circle cx="515" cy="277" r="16"/><circle cx="585" cy="277" r="16"/><circle cx="362" cy="407" r="18"/><circle cx="452" cy="407" r="18"/></g>
+  <rect x="22" y="24" width="300" height="58" rx="8" fill="#173b37" opacity=".92"/><text x="42" y="50" fill="#b4e84b" font-family="Arial" font-size="14" font-weight="700">CONTROLLED DEMO FRAME</text><text x="42" y="70" fill="white" font-family="Arial" font-size="13">Segmen 02:14–02:37 · Kuta corridor</text>
+  <rect x="525" y="375" width="245" height="48" rx="7" fill="white" opacity=".92"/><text x="548" y="404" fill="#173b37" font-family="Arial" font-size="15" font-weight="700">Bukan bukti sumber asli</text>
+</svg>
