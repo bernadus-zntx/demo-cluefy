@@ -66,7 +66,7 @@ export type AuditSnapshot = {
 export type AuditEvent = {
   id: string;
   actor: string;
-  action: 'created' | 'evidence_added' | 'corrected' | 'submitted' | 'approved' | 'rejected' | 'watchlisted' | 'watchlist_removed' | 'monitoring' | 'distributed' | 'escalated' | 'communication_drafted';
+  action: 'created' | 'evidence_added' | 'corrected' | 'submitted' | 'approved' | 'rejected' | 'commented' | 'watchlisted' | 'watchlist_removed' | 'monitoring' | 'distributed' | 'escalated' | 'communication_drafted';
   createdAt: string;
   note: string;
   before: AuditSnapshot | null;
@@ -107,6 +107,7 @@ export type Command =
   | { type: 'attach'; evidence: EvidenceInput; reason: string }
   | { type: 'correct'; title: string; analysis: string; summary?: string; recommendation?: string; issue: string; location?: string; entities: string[]; sentiment: Sentiment; emotion?: string; severity: Severity; confidence?: number; reason: string }
   | { type: 'submit' | 'approve' | 'reject'; reason: string }
+  | { type: 'comment'; reason: string }
   | { type: 'monitor'; reason: string }
   | { type: 'watchlist'; enabled: boolean; reason: string }
   | { type: 'escalate'; reason: string; caseId: string }
@@ -229,6 +230,10 @@ export function transition(finding: Finding, command: Command, at: string): Find
     };
     next = { ...finding, status: decision.decision, validationStatus: decision.decision, reviewDecisions: [...finding.reviewDecisions, decision] };
     action = command.type === 'approve' ? 'approved' : 'rejected';
+  } else if (command.type === 'comment') {
+    if (!note) throw new Error('Komentar review wajib diisi.');
+    next = { ...finding };
+    action = 'commented';
   } else if (command.type === 'watchlist') {
     next = { ...finding, watchlisted: command.enabled };
     action = command.enabled ? 'watchlisted' : 'watchlist_removed';

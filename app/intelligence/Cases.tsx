@@ -22,9 +22,9 @@ const seedCase: CaseRecord = {
     {stage:'Laporan Masuk',status:'Done',sla:'1h',elapsed:'18m'},{stage:'Validasi',status:'Done',sla:'2h',elapsed:'1.2h'},{stage:'Assessment',status:'Done',sla:'8h',elapsed:'6.4h'},{stage:'Koordinasi Petugas',status:'Done',sla:'4h',elapsed:'2.1h'},{stage:'Tindakan',status:'Done',sla:'24h',elapsed:'18.6h'},{stage:'Monitoring',status:'Active',sla:'48h',elapsed:'31h'},{stage:'Selesai',status:'Waiting',sla:'—',elapsed:'—'},
   ],
   objective: 'Menyiapkan respons terkoordinasi untuk peningkatan percakapan negatif terkait kemacetan kawasan wisata.', dueDate: '08 Okt 2026', updatedAt: '04 Okt 2026 · 16:40',
-  findings: [{ id: 'FND-DEMO-001', title: 'Lonjakan keluhan kemacetan Kuta–Canggu', issue: 'Kemacetan & Transportasi', severity: 'High', evidence: 'Video demo, segmen 02:14–02:37', recommendation: 'Validasi kondisi lapangan dan siapkan informasi rekayasa lalu lintas.' }],
+  findings: [{ id: 'FND-ARCHIVE-001', title: 'Lonjakan keluhan kemacetan Kuta–Canggu', issue: 'Kemacetan & Transportasi', severity: 'High', evidence: 'Video demo, segmen 02:14–02:37', recommendation: 'Validasi kondisi lapangan dan siapkan informasi rekayasa lalu lintas.' }],
   actions: [{ id: 'ACT-001', type: 'Official Statement', channel: 'Instagram & Media Online', draft: 'Pemkab Badung sedang melakukan koordinasi penanganan kepadatan pada koridor Kuta–Canggu. Informasi rekayasa lalu lintas dan jalur alternatif akan diperbarui melalui kanal resmi.', status: 'Published', publishedAt: '04 Okt 2026 · 16:00', publishedUrl: 'Demo publication · no external URL' }],
-  timeline: ['Finding FND-DEMO-001 ditambahkan', 'Case ditugaskan ke Dinas Perhubungan', 'Official Statement disetujui', 'Action ditandai Published', 'Impact monitoring dimulai'],
+  timeline: ['Finding FND-ARCHIVE-001 ditambahkan', 'Case ditugaskan ke Dinas Perhubungan', 'Official Statement disetujui', 'Action ditandai Published', 'Impact monitoring dimulai'],
   impact: { label: 'IMPROVING', beforeNegative: 72, after24: 49, after48: 31, beforeVolume: 1820, afterVolume: 1210 },
 };
 

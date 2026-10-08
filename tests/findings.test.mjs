@@ -154,6 +154,16 @@ test('watchlist marks a recurring finding without changing its validation state'
   assert.equal(removed.auditEvents.at(-1)?.action, 'watchlist_removed');
 });
 
+test('review comments are recorded without changing the active result', () => {
+  const draft = initial();
+  assert.throws(() => transition(draft, { type: 'comment', reason: ' ' }, at));
+  const commented = transition(draft, { type: 'comment', reason: 'Periksa kembali tag lokasi sebelum approval.' }, at);
+  assert.equal(commented.activeRevisionId, draft.activeRevisionId);
+  assert.equal(commented.validationStatus, draft.validationStatus);
+  assert.equal(commented.auditEvents.at(-1)?.action, 'commented');
+  assert.equal(commented.auditEvents.at(-1)?.note, 'Periksa kembali tag lokasi sebelum approval.');
+});
+
 test('public communication drafts require an approved finding and retain the source revision', () => {
   const draft = initial();
   assert.throws(() => transition(draft, { type: 'draft_communication', format: 'Press Release', content: 'Draft', reason: 'Generate' }, at));
