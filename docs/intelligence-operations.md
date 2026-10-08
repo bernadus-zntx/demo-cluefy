@@ -16,9 +16,9 @@ Evidence, WhatsApp distribution, Action, Impact, Video Analysis, network analysi
 
 ## Public and media intelligence
 
-Aspirasi Warga remains a content explorer and now exposes source classification, primary filters, and advanced contextual filters. Isu Daerah is the aggregation layer and links to conversations, Findings, Cases, and Media Monitoring. A Finding is a synthesis across one or more evidence items; it is not a copy of one post.
+Aspirasi Warga remains a content explorer and now exposes source classification, primary filters, and advanced contextual filters. Isu Daerah is the aggregation layer and links to conversations, Findings, Cases, and Media Monitoring. A Finding is a synthesis of recurring, related information across multiple aspirations and source signals; it is not a copy of one post. The Decision Room exposes Related Aspirasi separately from evidence provenance so users can understand how single information becomes a multiple-source Finding.
 
-The Finding model retains evidence provenance, original AI output, immutable human corrections, review decisions, and before/after audit snapshots. Distribution points to the exact approved revision. The seeded golden-path Finding combines three evidence records and labels controlled demo evidence separately from the official Kabupaten Badung source.
+The Finding model retains evidence provenance, original AI output, immutable human corrections, review decisions, and before/after audit snapshots. Distribution and AI-assisted communication drafts point to the exact approved revision. Analysts can add a Finding to a Watchlist without changing its severity or validation state. Approved Findings can be monitored, broadcast internally, escalated into Cases, or used to draft a press release, talking points, and a social media brief. The seeded golden-path Finding combines three evidence records and labels controlled demo evidence separately from the official Kabupaten Badung source.
 
 Media Monitoring uses the same Badung issue vocabulary and period shown elsewhere in the demo. One content record links to an official Kabupaten Badung page. Other illustrative reach, engagement, trend, and content records are labeled as controlled demo data and do not claim complete internet coverage.
 

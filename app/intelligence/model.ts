@@ -3,6 +3,7 @@ export type FindingValidationStatus = 'Draft' | 'In Review' | 'Approved' | 'Reje
 export type FindingDisposition = 'Undecided' | 'Monitoring' | 'Broadcasted' | 'Escalated' | 'Closed';
 export type Severity = 'Low' | 'Medium' | 'High' | 'Critical';
 export type Sentiment = 'Positive' | 'Neutral' | 'Negative';
+export type CommunicationFormat = 'Press Release' | 'Talking Points' | 'Social Media Brief';
 
 export type Evidence = {
   id: string;
@@ -59,12 +60,13 @@ export type AuditSnapshot = {
   entities: string[];
   sentiment: Sentiment;
   severity: Severity;
+  watchlisted: boolean;
 };
 
 export type AuditEvent = {
   id: string;
   actor: string;
-  action: 'created' | 'evidence_added' | 'corrected' | 'submitted' | 'approved' | 'rejected' | 'monitoring' | 'distributed' | 'escalated';
+  action: 'created' | 'evidence_added' | 'corrected' | 'submitted' | 'approved' | 'rejected' | 'watchlisted' | 'watchlist_removed' | 'monitoring' | 'distributed' | 'escalated' | 'communication_drafted';
   createdAt: string;
   note: string;
   before: AuditSnapshot | null;
@@ -83,12 +85,14 @@ export type Finding = {
   status: FindingStatus;
   validationStatus: FindingValidationStatus;
   disposition: FindingDisposition;
+  watchlisted: boolean;
   relatedCaseIds: string[];
   activeRevisionId: string;
   evidence: Evidence[];
   revisions: AnalysisRevision[];
   reviewDecisions: ReviewDecision[];
   distributions: Array<{ id: string; revisionId: string; destination: string; message: string; createdAt: string }>;
+  communicationDrafts: Array<{ id: string; revisionId: string; format: CommunicationFormat; content: string; createdBy: string; createdAt: string }>;
   auditEvents: AuditEvent[];
 };
 
@@ -104,8 +108,10 @@ export type Command =
   | { type: 'correct'; title: string; analysis: string; summary?: string; recommendation?: string; issue: string; location?: string; entities: string[]; sentiment: Sentiment; emotion?: string; severity: Severity; confidence?: number; reason: string }
   | { type: 'submit' | 'approve' | 'reject'; reason: string }
   | { type: 'monitor'; reason: string }
+  | { type: 'watchlist'; enabled: boolean; reason: string }
   | { type: 'escalate'; reason: string; caseId: string }
-  | { type: 'distribute'; reason: string; destination: string; message: string };
+  | { type: 'distribute'; reason: string; destination: string; message: string }
+  | { type: 'draft_communication'; reason: string; format: CommunicationFormat; content: string };
 
 const reviewer = 'Budi Santoso · reviewer demo';
 
@@ -126,6 +132,7 @@ function snapshot(finding: Finding): AuditSnapshot {
     entities: finding.entities,
     sentiment: finding.sentiment,
     severity: finding.severity,
+    watchlisted: finding.watchlisted,
   };
 }
 
@@ -222,6 +229,10 @@ export function transition(finding: Finding, command: Command, at: string): Find
     };
     next = { ...finding, status: decision.decision, validationStatus: decision.decision, reviewDecisions: [...finding.reviewDecisions, decision] };
     action = command.type === 'approve' ? 'approved' : 'rejected';
+  } else if (command.type === 'watchlist') {
+    next = { ...finding, watchlisted: command.enabled };
+    action = command.enabled ? 'watchlisted' : 'watchlist_removed';
+    note ||= command.enabled ? 'Finding ditambahkan ke Watchlist.' : 'Finding dihapus dari Watchlist.';
   } else if (command.type === 'monitor') {
     if (finding.validationStatus !== 'Approved') throw new Error('Hanya finding terverifikasi yang dapat dimonitor.');
     next = { ...finding, disposition: 'Monitoring' };
@@ -240,6 +251,13 @@ export function transition(finding: Finding, command: Command, at: string): Find
     next = { ...finding, status: 'Distributed', disposition: finding.disposition==='Escalated'?'Escalated':'Broadcasted', distributions: [...finding.distributions, distribution] };
     action = 'distributed';
     note ||= `Dikirim ke ${distribution.destination}.`;
+  } else if (command.type === 'draft_communication') {
+    if (finding.validationStatus !== 'Approved') throw new Error('Hanya finding terverifikasi yang dapat menjadi dasar komunikasi publik.');
+    if (!command.content.trim()) throw new Error('Isi communication draft wajib tersedia.');
+    const draft = { id: `${finding.id}-COM-${String(finding.communicationDrafts.length + 1).padStart(3, '0')}`, revisionId: finding.activeRevisionId, format: command.format, content: command.content.trim(), createdBy: reviewer, createdAt: at };
+    next = { ...finding, communicationDrafts: [...finding.communicationDrafts, draft] };
+    action = 'communication_drafted';
+    note ||= `${draft.format} dibuat dari approved Finding.`;
   } else {
     throw new Error('Perintah finding tidak dikenali.');
   }
@@ -276,7 +294,7 @@ export function createFinding(id: string, input: EvidenceInput, issue: string, s
   };
   const finding: Finding = {
     id, workspaceId: 'government', title, issue, entities: revision.entities, sentiment, severity: revision.severity, location: revision.location,
-    status: 'Draft', validationStatus:'Draft', disposition:'Undecided', relatedCaseIds:[], activeRevisionId: revision.id, evidence: [evidence], revisions: [revision], reviewDecisions: [], distributions: [], auditEvents: [],
+    status: 'Draft', validationStatus:'Draft', disposition:'Undecided', watchlisted:false, relatedCaseIds:[], activeRevisionId: revision.id, evidence: [evidence], revisions: [revision], reviewDecisions: [], distributions: [], communicationDrafts: [], auditEvents: [],
   };
   return {
     ...finding,

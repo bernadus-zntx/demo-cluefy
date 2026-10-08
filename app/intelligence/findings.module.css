@@ -17,16 +17,6 @@
 .tag{display:flex;align-items:center;gap:5px;background:#e8e8f8;color:#4a4591}
 .aiMark{display:inline-grid;place-items:center;width:17px;height:17px;flex:none;border-radius:6px;background:linear-gradient(145deg,#665ac6,#248d8c);color:#fff}
 .aiMark svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linejoin:round}
-.aiExplainer{display:grid;grid-template-columns:minmax(210px,.75fr) minmax(300px,1.4fr);gap:8px 18px;align-items:center;margin-bottom:10px;border:1px solid #d8d7f0;border-radius:10px;background:linear-gradient(100deg,#f2f1fb,#f7fbfa);padding:11px 13px}
-.aiExplainerTitle{display:flex;align-items:center;gap:8px}
-.aiExplainerTitle .aiMark{width:30px;height:30px;border-radius:9px}
-.aiExplainerTitle .aiMark svg{width:17px;height:17px}
-.aiExplainerTitle strong,.aiExplainerTitle small{display:block}
-.aiExplainerTitle strong{font-size:9px;color:#403a84}
-.aiExplainerTitle small{font-size:6.5px;color:#686393}
-.aiExplainer>p{margin:0;color:#536863;font-size:7.5px;line-height:1.55}
-.aiCapabilities{grid-column:1/3;display:flex;gap:5px;flex-wrap:wrap;padding-left:38px}
-.aiCapabilities span{border:1px solid #d9d7ee;border-radius:10px;background:#fff;color:#5b558b;padding:4px 7px;font-size:6px;font-weight:700}
 .purposeFlow .aiFlow .aiMark{width:24px;height:24px;border-radius:50%}
 .purposeFlow .aiFlow strong{color:#4a4591}
 .cardTop .aiGenerated{display:inline-flex;align-items:center;gap:4px;background:#eeecfb;color:#4a4591}
@@ -38,4 +28,34 @@
 .insightHero .insightOrigin{display:flex;align-items:center;gap:5px;color:#4a4591}
 .insightHero .insightOrigin .aiMark{width:16px;height:16px;border-radius:5px}
 .insightHero .insightOrigin .aiMark svg{width:9px;height:9px}
-@media(max-width:900px){.aiExplainer{grid-template-columns:1fr}.aiExplainer>p,.aiCapabilities{grid-column:1}.aiCapabilities{padding-left:38px}}
+.watchlistBadge{background:#fff0d2;color:#945f00}
+.roomHeaderActions{display:flex;align-items:center;gap:7px}
+.roomHeaderActions>button{border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--teal-dark);padding:7px 9px;font-size:7px;font-weight:700}
+.roomHeaderActions>button:last-child{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:50%;background:#e8efed;color:var(--ink);padding:0;font-size:17px}
+.roomHeaderActions .watchlisted{border-color:#e5b54e;background:#fff4dc;color:#845600}
+.relatedWorkspace{padding:14px}
+.relatedIntro{margin:-2px 0 10px;color:var(--muted);font-size:8px}
+.relatedList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.relatedCard{border:1px solid var(--line);border-radius:9px;background:#fff;padding:13px}
+.relatedIdentity{display:flex;align-items:center;gap:8px;border-bottom:1px solid #edf1f0;padding-bottom:9px}
+.relatedIdentity>span{display:grid;place-items:center;width:29px;height:29px;border-radius:8px;background:#e1eeea;color:var(--teal-dark);font-size:7px;font-weight:800}
+.relatedIdentity>div{display:flex;flex:1;flex-direction:column}
+.relatedIdentity b{font-size:8px}.relatedIdentity small{color:var(--muted);font-size:6.5px}
+.relatedIdentity em{border-radius:8px;background:#efedfb;color:#504a91;padding:4px 6px;font-size:6px;font-style:normal;font-weight:800}
+.relatedCard>p{min-height:48px;margin:10px 0 6px;color:#405b56;font-size:8.5px;line-height:1.55}
+.relatedTranslation{display:block;border-radius:6px;background:#f3f6f5;padding:7px;color:var(--muted);font-size:7px}
+.relatedCard>footer{display:flex;align-items:center;gap:7px;margin-top:9px;border-top:1px solid #edf1f0;padding-top:8px;color:var(--muted);font-size:6.5px}
+.relatedCard footer b{color:var(--teal-dark)}.relatedCard footer a,.relatedCard footer em{margin-left:auto;color:var(--teal-dark);font-style:normal;font-weight:700;text-decoration:none}
+.decisionCards{grid-template-columns:repeat(4,1fr)}
+.communicationPanel{display:grid;grid-template-columns:1.35fr .65fr;gap:10px;margin-top:10px}
+.communicationPanel>div{border:1px solid var(--line);border-radius:9px;background:#fff;padding:13px}
+.communicationPanel label{display:flex;flex-direction:column;gap:4px;margin-top:8px;color:var(--muted);font-size:7px;font-weight:600}
+.communicationPanel textarea{resize:vertical;line-height:1.55}
+.communicationHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.communicationHead small{display:flex;align-items:center;gap:5px;color:#4a4591;font-size:6px;font-weight:800;letter-spacing:.6px}
+.communicationHead .aiMark{width:16px;height:16px;border-radius:5px}.communicationHead .aiMark svg{width:9px;height:9px}
+.communicationHead h3{margin-top:4px;font-size:11px}.communicationHead>button{border:1px solid var(--teal-dark);border-radius:7px;background:#fff;color:var(--teal-dark);padding:7px 9px;font-size:7px}
+.communicationGuide{background:#eeecfb!important}.communicationGuide small{font-size:6px;font-weight:800;letter-spacing:.6px;color:#5b558b}.communicationGuide h3{margin:5px 0;font-size:12px}.communicationGuide p{color:#5d5a78;font-size:8px;line-height:1.55}.communicationGuide button{width:100%;border:1px solid #514a94;border-radius:7px;background:#514a94;color:#fff;padding:8px;font-size:7px}
+@media(max-width:1000px){.decisionCards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.relatedList,.communicationPanel{grid-template-columns:1fr}}
+@media(max-width:600px){.decisionCards{grid-template-columns:1fr}.roomHeaderActions{align-items:flex-end;flex-direction:column-reverse}}

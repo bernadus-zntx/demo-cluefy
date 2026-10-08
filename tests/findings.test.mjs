@@ -142,3 +142,29 @@ test('an approved finding can be escalated to a case without changing validation
   assert.deepEqual(escalated.relatedCaseIds, ['CASE-BDG-009']);
   assert.equal(escalated.auditEvents.at(-1)?.action, 'escalated');
 });
+
+test('watchlist marks a recurring finding without changing its validation state', () => {
+  const draft = initial();
+  const watched = transition(draft, { type: 'watchlist', enabled: true, reason: 'Perlu perhatian lintas sumber' }, at);
+  assert.equal(watched.watchlisted, true);
+  assert.equal(watched.validationStatus, 'Draft');
+  assert.equal(watched.auditEvents.at(-1)?.action, 'watchlisted');
+  const removed = transition(watched, { type: 'watchlist', enabled: false, reason: 'Tidak lagi menjadi fokus' }, at);
+  assert.equal(removed.watchlisted, false);
+  assert.equal(removed.auditEvents.at(-1)?.action, 'watchlist_removed');
+});
+
+test('public communication drafts require an approved finding and retain the source revision', () => {
+  const draft = initial();
+  assert.throws(() => transition(draft, { type: 'draft_communication', format: 'Press Release', content: 'Draft', reason: 'Generate' }, at));
+  const approved = transition(
+    transition(draft, { type: 'submit', reason: 'Ready' }, at),
+    { type: 'approve', reason: 'Evidence verified' },
+    at,
+  );
+  const composed = transition(approved, { type: 'draft_communication', format: 'Press Release', content: 'Isi siaran pers', reason: 'Draft komunikasi publik' }, at);
+  assert.equal(composed.communicationDrafts.length, 1);
+  assert.equal(composed.communicationDrafts[0].revisionId, approved.activeRevisionId);
+  assert.equal(composed.communicationDrafts[0].format, 'Press Release');
+  assert.equal(composed.auditEvents.at(-1)?.action, 'communication_drafted');
+});
