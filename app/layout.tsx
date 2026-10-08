@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./service-performance.css";
 
 export const metadata: Metadata = {
   title: "ClueFy — Social Intelligence Platform",

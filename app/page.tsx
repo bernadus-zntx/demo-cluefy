@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Cases, CasesProvider } from "./intelligence/Cases";
+import { Cases, CasesProvider, useCases } from "./intelligence/Cases";
 import { FindingsProvider, Findings, ConversationActions } from "./intelligence/Findings";
 import { MediaMonitoring } from "./intelligence/MediaMonitoring";
 import { AspirasiWarga } from "./intelligence/AspirasiWarga";
@@ -154,16 +154,44 @@ function LeaderImageV3(){
   return <><div className="actor-selector"><div><small>ACTOR INTELLIGENCE</small><b>Actor yang dianalisis</b></div><select value={actor} onChange={event=>setActor(event.target.value)}><option>Kepala Daerah Kabupaten Badung</option><option>Wakil Kepala Daerah Kabupaten Badung</option><option>Sekretaris Daerah Kabupaten Badung</option></select><button>＋ Tambah Actor</button><p>Sentimen dihitung terhadap actor sebagai target, bukan hanya karena actor disebut dalam konten.</p></div><LeaderImage/></>;
 }
 
-function ServicePerformanceV3(){
+function ServicePerformanceV3({navigate}:{navigate:(target:string)=>void}){
   const [opd,setOpd]=useState('Semua Dinas');
-  const workflows:Record<string,string[]>={'DLHK':['Laporan Masuk','Verifikasi Lokasi','Assign Petugas','Penanganan Lapangan','Upload Bukti','Verifikasi','Selesai'],'PUPR':['Laporan Masuk','Verifikasi','Survey','Assessment','Penjadwalan','Pengerjaan','QC','Selesai'],'Dishub':['Laporan Masuk','Validasi','Assessment','Koordinasi Petugas','Tindakan','Monitoring','Selesai'],'Disdukcapil':['Permohonan / Keluhan','Verifikasi Dokumen','Validasi Data','Proses Administrasi','Dokumen Selesai','Penyerahan'],'DPMPTSP':['Permohonan Masuk','Verifikasi Berkas','Validasi Teknis','Persetujuan','Izin Terbit'],'BAPENDA':['Permohonan / Keluhan','Verifikasi Wajib Pajak','Validasi Data','Proses','Penyelesaian']};
-  const activeOpd=opd==='Semua Dinas'?'PUPR':opd;
+  const {createManual}=useCases();
+  const integrations=[
+    {opd:'DPMPTSP',system:'SIMBG & OSS',status:'Online',sync:'2 menit lalu',latency:'420 ms',records:'386'},
+    {opd:'BAPENDA',system:'Sistem Pajak Daerah',status:'Online',sync:'6 menit lalu',latency:'610 ms',records:'294'},
+    {opd:'Disdukcapil',system:'SIAK Terintegrasi',status:'Offline',sync:'2 jam lalu',latency:'Timeout',records:'—'},
+    {opd:'PUPR',system:'Portal Infrastruktur',status:'Online',sync:'4 menit lalu',latency:'530 ms',records:'264'},
+    {opd:'Dishub',system:'ATCS & Pengaduan',status:'Online',sync:'8 menit lalu',latency:'780 ms',records:'318'},
+    {opd:'DLHK',system:'Operasional Kebersihan',status:'Offline',sync:'5 jam lalu',latency:'Timeout',records:'—'},
+  ];
+  const services=[
+    {name:'Penerbitan KTP-el',opd:'Disdukcapil',volume:1284,share:24,change:'+8.2%',sla:93.4},
+    {name:'Pembayaran & Validasi PBB',opd:'BAPENDA',volume:1026,share:19,change:'+4.6%',sla:86.1},
+    {name:'Perizinan Berusaha / OSS',opd:'DPMPTSP',volume:842,share:16,change:'+12.1%',sla:89.1},
+    {name:'Penerbitan Akta Kelahiran',opd:'Disdukcapil',volume:718,share:13,change:'+5.8%',sla:91.8},
+    {name:'Pengaduan Jalan & Drainase',opd:'PUPR',volume:596,share:11,change:'+18.4%',sla:61.8},
+    {name:'Pengangkutan Sampah',opd:'DLHK',volume:508,share:9,change:'+14.2%',sla:68.2},
+    {name:'Penanganan Lalu Lintas',opd:'Dishub',volume:420,share:8,change:'+9.7%',sla:72.4},
+  ];
+  const slaAttention=[
+    {service:'Pengaduan Jalan & Drainase',opd:'PUPR',sla:61.8,target:85,response:'5.4 hari',backlog:42,severity:'Critical'},
+    {service:'Pengangkutan Sampah',opd:'DLHK',sla:68.2,target:85,response:'3.2 hari',backlog:37,severity:'High'},
+    {service:'Penanganan Lalu Lintas',opd:'Dishub',sla:72.4,target:85,response:'3.1 hari',backlog:31,severity:'High'},
+  ];
   const rows=[['DPMPTSP','386','344','89.1%','2.1 hari','18'],['BAPENDA','294','246','83.7%','2.8 hari','26'],['Disdukcapil','428','390','91.1%','1.8 hari','14'],['PUPR','264','181','68.6%','5.4 hari','42'],['Dishub','318','252','79.2%','3.1 hari','31'],['DLHK','352','270','76.7%','3.2 hari','37']];
-  return <><div className="section-intro"><h2>Kinerja Layanan per Dinas / OPD</h2><p>Analitik operasional dari case dan workflow dinas. Struktur siap dihubungkan ke API DPMPTSP, BAPENDA, Dukcapil, dan OPD lain.</p></div><div className="service-filters"><label>Dinas / OPD<select value={opd} onChange={event=>setOpd(event.target.value)}>{['Semua Dinas','DPMPTSP','BAPENDA','Disdukcapil','PUPR','Dishub','DLHK'].map(item=><option key={item}>{item}</option>)}</select></label><label>Periode<select><option>04 Agu–04 Okt 2026</option></select></label><label>Kecamatan<select><option>Semua kecamatan</option></select></label><label>Status<select><option>Semua status</option></select></label><span>DATA DEMO · API READY</span></div>
-    <div className="kpis"><div className="kpi"><small>Incoming</small><strong>2,042</strong><p>Case / workflow masuk</p></div><div className="kpi"><small>Handled</small><strong>1,683</strong><p>82.4% sudah ditangani</p></div><div className="kpi"><small>Resolved</small><strong>1,421</strong><p className="up">↗ 4.8% periode ini</p></div><div className="kpi"><small>SLA Compliance</small><strong>82.6%</strong><p>Rata-rata respons 2.4 hari</p></div></div>
-    <section className="card opd-performance"><CardTitle title="OPD Performance" note="Executive → OPD → Process"/><div className="opd-row opd-head"><span>DINAS / OPD</span><span>INCOMING</span><span>RESOLVED</span><span>SLA</span><span>AVG RESPONSE</span><span>ACTIVE CASES</span></div>{rows.filter(row=>opd==='Semua Dinas'||row[0]===opd).map(row=><button className="opd-row" key={row[0]} onClick={()=>setOpd(row[0])}><b>{row[0]}</b>{row.slice(1).map((cell,index)=><span key={index}>{cell}</span>)}</button>)}</section>
-    <div className="grid-main service-process"><section className="card"><CardTitle title={`${activeOpd} Workflow`} note="Tahap dapat dikonfigurasi per OPD"/><div className="workflow-stages">{workflows[activeOpd].map((stage,index)=><div key={stage} className={index===3?'bottleneck':''}><span>{index+1}</span><b>{stage}</b><small>{index===3?'18.4h avg · SLA 8h':`${[1.2,2.8,4.1,6.2,3.4,2.1,1.4,0.8][index]}h avg`}</small></div>)}</div></section><section className="card bottleneck-card"><span>BOTTLENECK DETECTED</span><h3>Assessment melebihi SLA</h3><strong>18.4h <small>vs SLA 8h</small></strong><p>42 active cases menunggu assessment. Eskalasi diarahkan ke tim proses {activeOpd}.</p><button>Lihat case terdampak →</button></section></div>
-    <div className="integration-note"><b>API Integration Layer</b><span>DPMPTSP</span><span>BAPENDA</span><span>Disdukcapil</span><span>PUPR</span><span>Dishub</span><span>DLHK</span><em>Mapping workflow, SLA, status, dan responsible team bersifat configurable.</em></div></>;
+  const visibleIntegrations=integrations.filter(item=>opd==='Semua Dinas'||item.opd===opd);
+  const visibleServices=services.filter(item=>opd==='Semua Dinas'||item.opd===opd);
+  const visibleAttention=slaAttention.filter(item=>opd==='Semua Dinas'||item.opd===opd);
+  function createSlaCase(item:typeof slaAttention[number]){createManual({title:`SLA rendah · ${item.service}`,type:'Issue',severity:item.severity,source:`Kinerja Layanan ${item.opd}`,location:'Kabupaten Badung',objective:`Tingkatkan pencapaian SLA ${item.service} dari ${item.sla}% menuju target ${item.target}% dan selesaikan ${item.backlog} layanan tertunda.`,primaryOpd:item.opd,dueDate:'',reporter:'ClueFy Service Intelligence'});navigate('Cases');}
+  return <><div className="section-intro service-heading"><div><span>SERVICE INTELLIGENCE</span><h2>Kinerja Layanan per Dinas / OPD</h2><p>Pantau kesehatan integrasi data, volume layanan, pencapaian SLA, dan area yang membutuhkan perhatian.</p></div><div><b>{integrations.filter(item=>item.status==='Online').length}/{integrations.length}</b><span>API Online</span></div></div>
+    <div className="service-filters"><label>Dinas / OPD<select value={opd} onChange={event=>setOpd(event.target.value)}>{['Semua Dinas','DPMPTSP','BAPENDA','Disdukcapil','PUPR','Dishub','DLHK'].map(item=><option key={item}>{item}</option>)}</select></label><label>Periode<select><option>04 Agu–04 Okt 2026</option></select></label><label>Kecamatan<select><option>Semua kecamatan</option></select></label><label>SLA<select><option>Semua SLA</option><option>Di bawah target</option><option>Sesuai target</option></select></label><span>DATA DEMO · API READY</span></div>
+    <section className="card api-layer"><div className="api-layer-head"><div><span>API INTEGRATION LAYER</span><h3>Status Koneksi Sistem Dinas</h3><p>Status sinkronisasi terakhir sebelum data digunakan dalam dashboard.</p></div><div><b className="api-online-count">● {integrations.filter(item=>item.status==='Online').length} Online</b><b className="api-offline-count">● {integrations.filter(item=>item.status==='Offline').length} Offline</b></div></div><div className="api-grid">{visibleIntegrations.map(item=><button key={item.opd} className={`api-card ${item.status.toLowerCase()}`} onClick={()=>setOpd(item.opd)}><header><span>{item.opd.slice(0,2)}</span><em>● {item.status}</em></header><b>{item.opd}</b><p>{item.system}</p><footer><span><small>LAST SYNC</small>{item.sync}</span><span><small>LATENCY</small>{item.latency}</span><span><small>RECORDS</small>{item.records}</span></footer></button>)}</div></section>
+    <div className="kpis service-kpis"><div className="kpi"><small>Total Permohonan</small><strong>5,394</strong><p className="up">↗ 8.6% periode ini</p></div><div className="kpi"><small>Layanan Selesai</small><strong>4,612</strong><p>85.5% dari total masuk</p></div><div className="kpi"><small>SLA Compliance</small><strong>82.6%</strong><p>Target kabupaten 85%</p></div><div className="kpi attention-kpi"><small>Perlu Perhatian</small><strong>3 layanan</strong><p>Di bawah target SLA</p></div></div>
+    <div className="service-intelligence-grid"><section className="card frequent-services"><CardTitle title="Layanan Paling Sering Digunakan" note="Volume permohonan / transaksi dalam periode aktif"/><div className="frequent-head"><span>LAYANAN</span><span>VOLUME</span><span>PORSI</span><span>SLA</span></div>{visibleServices.map((service,index)=><article key={service.name}><span className="service-rank">{String(index+1).padStart(2,'0')}</span><div><b>{service.name}</b><small>{service.opd} · <em>{service.change}</em></small></div><strong>{service.volume.toLocaleString('id-ID')}</strong><span><i><em style={{width:`${service.share*3.5}%`}}/></i><b>{service.share}%</b></span><span className={service.sla<75?'sla-bad':service.sla<85?'sla-warning':'sla-good'}>{service.sla}%</span></article>)}</section>
+      <section className="card sla-attention"><div className="sla-title"><div><span>PERHATIAN KHUSUS</span><h3>SLA Terendah</h3><p>Layanan di bawah target 85%.</p></div><b>!</b></div>{visibleAttention.length?visibleAttention.map(item=><article key={item.service}><header><div><b>{item.service}</b><span>{item.opd}</span></div><strong>{item.sla}%</strong></header><div className="sla-track"><i style={{width:`${item.sla}%`}}/><em style={{left:`${item.target}%`}}/></div><p><span>Respons {item.response}</span><span>{item.backlog} tertunda</span><span>Target {item.target}%</span></p><button onClick={()=>createSlaCase(item)}>＋ Buat Case Perhatian</button></article>):<div className="service-empty">Tidak ada layanan dengan SLA rendah untuk filter ini.</div>}</section></div>
+    <section className="card opd-performance"><CardTitle title="Performa per OPD" note="Klik OPD untuk memfilter seluruh dashboard"/><div className="opd-row opd-head"><span>DINAS / OPD</span><span>INCOMING</span><span>RESOLVED</span><span>SLA</span><span>AVG RESPONSE</span><span>ACTIVE CASES</span></div>{rows.filter(row=>opd==='Semua Dinas'||row[0]===opd).map(row=><button className="opd-row" key={row[0]} onClick={()=>setOpd(row[0])}><b>{row[0]}</b>{row.slice(1).map((cell,index)=><span className={index===2&&Number(String(cell).replace('%',''))<75?'table-sla-low':''} key={index}>{cell}</span>)}</button>)}</section>
+  </>;
 }
 
 function BadungOverview(){
@@ -212,7 +240,7 @@ function Dashboard() {
   const navItems=isValidation?["Overview","Validate Contact","Footprint Data","Batch Results","Methodology"]:isGovernment?governmentSections.flatMap(section=>section.items):nav;
   const labels:Record<string,string>=isValidation?{Overview:"Validation Overview","Validate Contact":"Validate Contact","Footprint Data":"Footprint Data","Batch Results":"Batch Results",Methodology:"Methodology"}:isGovernment?{Overview:"Overview",Conversations:"Aspirasi Warga",Topics:"Isu Daerah","Brand Analysis":"Kinerja Layanan","Leader Image":"Citra Kepala Daerah","Data Sources":"Sumber Data",Findings:"Findings",Cases:"Cases","Media Monitoring":"Media Monitoring"}:{Overview:"Overview",Conversations:"Conversations",Topics:"Topics","Brand Analysis":"Brand Analysis","Competitor Analysis":"Competitor Analysis","Data Sources":"Data Sources"};
   const navigate=(target:string)=>{setActive(target);setMenu(false);};
-  const pages:Record<string,React.ReactNode>={Overview:isGovernment?<BadungOverview/>:<Overview/>,Conversations:isGovernment?<AspirasiWarga/>:<Conversations/>,Topics:isGovernment?<RegionalIssues/>:<Topics/>,"Brand Analysis":isGovernment?<ServicePerformanceV3/>:<BrandAnalysis/>,"Competitor Analysis":isGovernment?<DistrictAnalysis/>:<Competitors/>,"Data Sources":<DataSources government={isGovernment}/>};
+  const pages:Record<string,React.ReactNode>={Overview:isGovernment?<BadungOverview/>:<Overview/>,Conversations:isGovernment?<AspirasiWarga/>:<Conversations/>,Topics:isGovernment?<RegionalIssues/>:<Topics/>,"Brand Analysis":isGovernment?<ServicePerformanceV3 navigate={navigate}/>:<BrandAnalysis/>,"Competitor Analysis":isGovernment?<DistrictAnalysis/>:<Competitors/>,"Data Sources":<DataSources government={isGovernment}/>};
   if(isGovernment){pages.Findings=<Findings/>;pages.Cases=<Cases/>;pages['Media Monitoring']=<MediaMonitoring navigate={navigate}/>;}
   pages["Leader Image"]=isGovernment?<LeaderImageV3/>:<LeaderImage/>;
   pages.Demographics=<Demographics/>;
