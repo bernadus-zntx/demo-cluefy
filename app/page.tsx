@@ -8,6 +8,7 @@ import { MediaMonitoring } from "./intelligence/MediaMonitoring";
 import { AspirasiWarga } from "./intelligence/AspirasiWarga";
 import { RegionalIssues } from "./intelligence/RegionalIssues";
 import { AraAssistant } from "./AraAssistant";
+import { CctvIntelligence } from "./intelligence/CctvIntelligence";
 
 const nav = ["Overview", "Conversations", "Topics", "Brand Analysis", "Competitor Analysis", "Data Sources"];
 
@@ -15,6 +16,7 @@ const icons: Record<string, string> = {
   Findings: "✦", Cases: "▣", Overview: "⌂", Conversations: "◉", Topics: "#", "Brand Analysis": "◇",
   "Competitor Analysis": "◎", "Leader Image": "♙", "Demographics": "◌", "Data Sources": "⇄",
   "Media Monitoring": "◫",
+  "CCTV Intelligence": "▧",
   "Validate Contact": "⌕", "Footprint Data": "◎", "Batch Results": "▤", "Methodology": "◈",
 };
 
@@ -305,12 +307,12 @@ function Dashboard() {
   if(!loggedIn)return <Login onLogin={segment=>{setIndustry(segment);setActive("Overview");setLoggedIn(true)}}/>;
   const isGovernment=industry==="government";
   const isValidation=industry==="validation";
-  const governmentSections=[{label:'',items:['Overview']},{label:'PUBLIC INTELLIGENCE',items:['Conversations','Topics','Findings','Cases','Brand Analysis']},{label:'MEDIA INTELLIGENCE',items:['Media Monitoring']},{label:'LEADERSHIP INTELLIGENCE',items:['Leader Image']},{label:'DATA & SYSTEM',items:['Data Sources']}];
+  const governmentSections=[{label:'',items:['Overview']},{label:'PUBLIC INTELLIGENCE',items:['Conversations','Topics','Findings','Cases','Brand Analysis','CCTV Intelligence']},{label:'MEDIA INTELLIGENCE',items:['Media Monitoring']},{label:'LEADERSHIP INTELLIGENCE',items:['Leader Image']},{label:'DATA & SYSTEM',items:['Data Sources']}];
   const navItems=isValidation?["Overview","Validate Contact","Footprint Data","Batch Results","Methodology"]:isGovernment?governmentSections.flatMap(section=>section.items):nav;
-  const labels:Record<string,string>=isValidation?{Overview:"Validation Overview","Validate Contact":"Validate Contact","Footprint Data":"Footprint Data","Batch Results":"Batch Results",Methodology:"Methodology"}:isGovernment?{Overview:"Overview",Conversations:"Aspirasi Warga",Topics:"Isu Daerah","Brand Analysis":"Kinerja Layanan","Leader Image":"Citra Kepala Daerah","Data Sources":"Sumber Data",Findings:"Findings",Cases:"Cases","Media Monitoring":"Media Monitoring"}:{Overview:"Overview",Conversations:"Conversations",Topics:"Topics","Brand Analysis":"Brand Analysis","Competitor Analysis":"Competitor Analysis","Data Sources":"Data Sources"};
+  const labels:Record<string,string>=isValidation?{Overview:"Validation Overview","Validate Contact":"Validate Contact","Footprint Data":"Footprint Data","Batch Results":"Batch Results",Methodology:"Methodology"}:isGovernment?{Overview:"Overview",Conversations:"Aspirasi Warga",Topics:"Isu Daerah","Brand Analysis":"Kinerja Layanan","CCTV Intelligence":"CCTV Intelligence","Leader Image":"Citra Kepala Daerah","Data Sources":"Sumber Data",Findings:"Findings",Cases:"Cases","Media Monitoring":"Media Monitoring"}:{Overview:"Overview",Conversations:"Conversations",Topics:"Topics","Brand Analysis":"Brand Analysis","Competitor Analysis":"Competitor Analysis","Data Sources":"Data Sources"};
   const navigate=(target:string)=>{setActive(target);setMenu(false);};
   const pages:Record<string,React.ReactNode>={Overview:isGovernment?<BadungOverview/>:<Overview/>,Conversations:isGovernment?<AspirasiWarga/>:<Conversations/>,Topics:isGovernment?<RegionalIssues/>:<Topics/>,"Brand Analysis":isGovernment?<ServicePerformanceV3 navigate={navigate}/>:<BrandAnalysis/>,"Competitor Analysis":isGovernment?<DistrictAnalysis/>:<Competitors/>,"Data Sources":<DataSources government={isGovernment}/>};
-  if(isGovernment){pages.Findings=<Findings/>;pages.Cases=<Cases/>;pages['Media Monitoring']=<MediaMonitoring navigate={navigate}/>;}
+  if(isGovernment){pages.Findings=<Findings/>;pages.Cases=<Cases/>;pages['CCTV Intelligence']=<CctvIntelligence/>;pages['Media Monitoring']=<MediaMonitoring navigate={navigate}/>;}
   pages["Leader Image"]=isGovernment?<LeaderImageV3/>:<LeaderImage/>;
   pages.Demographics=<Demographics/>;
   if(isValidation){pages.Overview=<><ExternalScoreBanner/><ValidationOverview/></>;pages["Validate Contact"]=<ValidateContact/>;pages["Footprint Data"]=<FootprintData/>;pages["Batch Results"]=<BatchResults/>;pages.Methodology=<ValidationMethodology/>}
@@ -318,7 +320,7 @@ function Dashboard() {
   const segmentName=isValidation?"DATA VALIDATION":isGovernment?"PUBLIC SECTOR":"CONSUMER & BEAUTY";
   return <div className="app-shell">
     <aside className={menu?"open":""}><Logo/><div className="workspace"><span>{isValidation?"O":isGovernment?"B":"C"}</span><div><small>ACTIVE SEGMENT</small><b>{workspaceName}</b></div></div><nav>{isGovernment?governmentSections.map(section=><div className="nav-section" key={section.label||'overview'}>{section.label&&<small>{section.label}</small>}{section.items.map(n=><button key={n} className={active===n?"active":""} onClick={()=>navigate(n)}><i>{icons[n]}</i><span className="nav-label"><span>{labels[n]}</span>{n==='Findings'&&<em>AI-powered synthesis</em>}</span></button>)}</div>):navItems.map(n=><button key={n} className={active===n?"active":""} onClick={()=>navigate(n)}><i>{icons[n]}</i>{labels[n]}</button>)}</nav><div className="sidebar-bottom"><button><i>?</i> Help Center</button><button><i>⚙</i> Settings</button><button onClick={()=>setLoggedIn(false)}><i>↪</i> Sign out</button><div className="user"><span>BS</span><div><b>Budi Santoso</b><small>{isValidation?"Validation Admin":isGovernment?"Badung Admin":"Brand Admin"}</small></div><button>•••</button></div></div></aside>
-    {menu&&<button className="scrim" aria-label="Close menu" onClick={()=>setMenu(false)}/>}<main><header><button className="menu-btn" aria-label="Open menu" onClick={()=>setMenu(true)}>☰</button><div><h1>{labels[active]}</h1><p>{isValidation?(active==="Overview"?"Privacy-safe external contact intelligence.":"Validate and review external footprint signals."):active==="Overview"?(isGovernment?"Pusat intelijen publik Kabupaten Badung.":"Your social intelligence command center."):active==='Findings'?"AI menemukan pola masalah berulang dari berbagai aspirasi dan sumber.":`Explore ${labels[active].toLowerCase()} insights across connected channels.`}</p></div><div className="header-actions"><div className="segment-chip"><span>{segmentName}</span><b>{workspaceName}</b></div><button className="date">◷ Last 28 days⌄</button><button className="notification">♢<i/></button><span className="header-avatar">BS</span></div></header><div className="content">{pages[active]}</div><footer>Data refreshed 4 minutes ago <span>•</span> ClueFy Intelligence Platform</footer></main>{isGovernment&&<AraAssistant key={active} activePage={labels[active]}/>}
+    {menu&&<button className="scrim" aria-label="Close menu" onClick={()=>setMenu(false)}/>}<main><header><button className="menu-btn" aria-label="Open menu" onClick={()=>setMenu(true)}>☰</button><div><h1>{labels[active]}</h1><p>{isValidation?(active==="Overview"?"Privacy-safe external contact intelligence.":"Validate and review external footprint signals."):active==="Overview"?(isGovernment?"Pusat intelijen publik Kabupaten Badung.":"Your social intelligence command center."):active==='Findings'?"AI menemukan pola masalah berulang dari berbagai aspirasi dan sumber.":active==='CCTV Intelligence'?"Pantau kamera publik, koneksi, dan konteks lalu lintas secara terpusat.":`Explore ${labels[active].toLowerCase()} insights across connected channels.`}</p></div><div className="header-actions"><div className="segment-chip"><span>{segmentName}</span><b>{workspaceName}</b></div><button className="date">◷ Last 28 days⌄</button><button className="notification">♢<i/></button><span className="header-avatar">BS</span></div></header><div className="content">{pages[active]}</div><footer>Data refreshed 4 minutes ago <span>•</span> ClueFy Intelligence Platform</footer></main>{isGovernment&&<AraAssistant key={active} activePage={labels[active]}/>}
   </div>;
 }
 

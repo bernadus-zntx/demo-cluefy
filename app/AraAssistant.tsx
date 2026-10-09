@@ -59,6 +59,12 @@ const pageContexts: Record<string, PageContext> = {
     suggestions: ["Layanan mana SLA-nya rendah?", "Apa layanan paling sering?", "Buat rekomendasi per OPD"],
     answer: "Pengaduan Jalan & Drainase perlu perhatian khusus karena pencapaian SLA 61,8% terhadap target 85% dan memiliki backlog 42 layanan. Volume permohonan tertinggi tetap perlu dibandingkan dengan kapasitas tiap OPD sebelum dibuat Case.",
   },
+  "CCTV Intelligence": {
+    label: "CCTV Intelligence",
+    intro: "Saya bisa merangkum kesehatan kamera, titik offline, dan lokasi yang perlu diperiksa.",
+    suggestions: ["Kamera mana sedang offline?", "Ringkas kondisi koneksi", "Titik mana perlu perhatian?"],
+    answer: "Periksa kamera berstatus offline atau connecting terlebih dahulu, lalu cocokkan lokasinya dengan isu lalu lintas dan Case aktif. Gangguan koneksi sebaiknya dicatat sebagai kejadian operasional beserta waktu terakhir kamera berhasil diperbarui.",
+  },
   "Media Monitoring": {
     label: "Media Monitoring",
     intro: "Saya bisa membaca sentimen media, penulis, dan artikel yang paling berpengaruh.",
