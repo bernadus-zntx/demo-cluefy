@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { Cases, CasesProvider, useCases } from "./intelligence/Cases";
-import { FindingsProvider, Findings, ConversationActions } from "./intelligence/Findings";
+import { FindingsProvider, Findings, ConversationActions, useFindings } from "./intelligence/Findings";
 import { MediaMonitoring } from "./intelligence/MediaMonitoring";
 import { AspirasiWarga } from "./intelligence/AspirasiWarga";
 import { RegionalIssues } from "./intelligence/RegionalIssues";
@@ -86,8 +86,8 @@ function Donut({government=false}:{government?:boolean}) {
   </div></div>;
 }
 
-function CardTitle({ title, note, action }: { title: string; note?: string; action?: string }) {
-  return <div className="card-title"><div><h3>{title}</h3>{note && <p>{note}</p>}</div>{action && <button className="text-btn">{action} →</button>}</div>;
+function CardTitle({ title, note, action, onAction }: { title: string; note?: string; action?: string; onAction?: () => void }) {
+  return <div className="card-title"><div><h3>{title}</h3>{note && <p>{note}</p>}</div>{action && <button className="text-btn" onClick={onAction}>{action} →</button>}</div>;
 }
 
 function Overview() {
@@ -111,7 +111,13 @@ function Overview() {
   </>;
 }
 
-function BadungOverviewSummary() {
+function BadungOverviewSummary({navigate}:{navigate:(target:string)=>void}) {
+  const {cases}=useCases();
+  const {findings}=useFindings();
+  const activeCases=cases.filter(item=>item.status!=='Selesai').length;
+  const waitingCases=cases.filter(item=>item.status==='Menunggu Respons OPD').length;
+  const priorityFindings=findings.filter(item=>['High','Critical'].includes(item.severity)&&item.validationStatus!=='Rejected').length;
+  const findingsNeedReview=findings.filter(item=>item.validationStatus==='Draft'||item.validationStatus==='In Review').length;
   return <>
     <div className="segment-banner"><div><span>PUBLIC SECTOR INTELLIGENCE</span><h2>Kabupaten Badung Command Center</h2><p>Memahami aspirasi warga, isu daerah, dan kinerja layanan publik secara terpadu.</p></div><div className="live-badge">● LIVE MONITORING</div></div>
     <div className="kpis">
@@ -120,13 +126,23 @@ function BadungOverviewSummary() {
       <div className="kpi"><div className="kpi-top"><span className="kpi-icon lime">☺</span><span className="change up">↗ 2.9%</span></div><small>Sentimen Positif</small><strong>58.7%</strong><p>Naik 2.1 poin bulan ini</p></div>
       <div className="kpi"><div className="kpi-top"><span className="kpi-icon orange">!</span><span className="priority-badge">Prioritas</span></div><small>Butuh Respons</small><strong>184</strong><p>32 isu prioritas tinggi</p></div>
     </div>
+    <section className="operational-intelligence" aria-labelledby="operational-intelligence-title">
+      <div className="operational-head"><div><span>LIVE OPERATIONAL SIGNALS</span><h3 id="operational-intelligence-title">Operational Intelligence</h3><p>Sinyal lapangan, performa layanan, Finding AI, dan tindak lanjut Case dalam satu ringkasan.</p></div><div className="ara-summary-badge">✦ ARA · LIVE SUMMARY</div></div>
+      <div className="operational-grid">
+        <button className="operational-card cctv" onClick={()=>navigate('CCTV Intelligence')}><span className="operational-icon">▧</span><div><small>NEARBY LIVE REFERENCE</small><strong>6 kamera live</strong><p>ATCS Kota Denpasar · sumber pembanding terdekat</p></div><em>Live tersedia</em><b>Buka CCTV →</b></button>
+        <button className="operational-card sla" onClick={()=>navigate('Brand Analysis')}><span className="operational-icon">◷</span><div><small>SLA LAYANAN</small><strong>3 perlu perhatian</strong><p>Compliance 82,6% · target kabupaten 85%</p></div><em>Di bawah target</em><b>Lihat Kinerja →</b></button>
+        <button className="operational-card cases" onClick={()=>navigate('Cases')}><span className="operational-icon">▣</span><div><small>CASE MANAGEMENT</small><strong>{activeCases} case aktif</strong><p>{waitingCases} menunggu respons OPD · audit trail tersedia</p></div><em>Perlu dipantau</em><b>Buka Cases →</b></button>
+        <button className="operational-card findings" onClick={()=>navigate('Findings')}><span className="operational-icon">✦</span><div><small>AI FINDINGS</small><strong>{priorityFindings} prioritas</strong><p>{findingsNeedReview} menunggu human review</p></div><em>AI synthesis</em><b>Review Findings →</b></button>
+      </div>
+      <div className="operational-brief"><span>✦</span><div><b>ARA Operational Brief</b><p>Kepadatan terpantau melalui live reference ATCS Denpasar. Percakapan negatif terkait transportasi tetap menjadi isu tertinggi, sementara tiga layanan publik berada di bawah target SLA. Prioritaskan review Finding dan tindak lanjut melalui Case terkait.</p></div><button onClick={()=>navigate('Cases')}>Lihat tindak lanjut →</button></div>
+    </section>
     <div className="grid-main"><section className="card wide"><CardTitle title="Tren Percakapan Publik" note="Volume harian dari seluruh sumber terpantau"/><div className="chart-summary"><b>42,680</b><span className="change up">↗ 10.4%</span><span>28 hari terakhir</span></div><TrendChart /></section><section className="card"><CardTitle title="Distribusi Sentimen" note="Seluruh aspirasi dan percakapan"/><Donut government/></section></div>
     <div className="grid-three">
-      <section className="card"><CardTitle title="Isu Paling Ramai" note="Berdasarkan volume percakapan" action="Lihat semua"/><div className="rank-list">{badungTopics.slice(0,4).map((x,i)=><div key={x[0]}><span className="rank">{i+1}</span><div><b>{x[0]}</b><small>{x[1]} percakapan</small></div><em className={x[2].startsWith("-")?"down":"up"}>{x[2]}</em></div>)}</div></section>
+      <section className="card"><CardTitle title="Isu Paling Ramai" note="Berdasarkan volume percakapan" action="Lihat semua" onAction={()=>navigate('Topics')}/><div className="rank-list">{badungTopics.slice(0,4).map((x,i)=><div key={x[0]}><span className="rank">{i+1}</span><div><b>{x[0]}</b><small>{x[1]} percakapan</small></div><em className={x[2].startsWith("-")?"down":"up"}>{x[2]}</em></div>)}</div></section>
       <section className="card"><CardTitle title="Sebaran per Kecamatan" note="Porsi percakapan publik" action="Eksplorasi"/><div className="brand-list">{[["Kuta",24,"#76acb8"],["Kuta Selatan",21,"#b4e84b"],["Kuta Utara",19,"#786fdb"],["Mengwi",16,"#e8a852"],["Lainnya",20,"#cdd4d1"]].map(x=><div key={x[0]}><span>{x[0]}</span><div><i style={{width:`${Number(x[1])*3.2}%`,background:String(x[2])}}/></div><b>{x[1]}%</b></div>)}</div></section>
-      <section className="card"><CardTitle title="Status Respons Isu" note="184 isu membutuhkan tindak lanjut" action="Lihat antrean"/><div className="response-stats"><div><span>Selesai</span><b>68</b><i><em style={{width:"74%"}}/></i></div><div><span>Dalam proses</span><b>84</b><i><em style={{width:"88%"}}/></i></div><div><span>Belum ditangani</span><b>32</b><i><em className="alert-bar" style={{width:"35%"}}/></i></div><p><strong>82.6%</strong> tingkat penyelesaian bulan ini</p></div></section>
+      <section className="card"><CardTitle title="Status Respons Isu" note="184 isu membutuhkan tindak lanjut" action="Lihat antrean" onAction={()=>navigate('Cases')}/><div className="response-stats"><div><span>Selesai</span><b>68</b><i><em style={{width:"74%"}}/></i></div><div><span>Dalam proses</span><b>84</b><i><em style={{width:"88%"}}/></i></div><div><span>Belum ditangani</span><b>32</b><i><em className="alert-bar" style={{width:"35%"}}/></i></div><p><strong>82.6%</strong> tingkat penyelesaian bulan ini</p></div></section>
     </div>
-    <section className="card table-card"><CardTitle title="Aspirasi & Percakapan Terbaru" note="Pembaruan terbaru dari kanal warga dan media" action="Lihat semua"/><ConversationTable rows={5} data={badungConversations}/></section>
+    <section className="card table-card"><CardTitle title="Aspirasi & Percakapan Terbaru" note="Pembaruan terbaru dari kanal warga dan media" action="Lihat semua" onAction={()=>navigate('Conversations')}/><ConversationTable rows={5} data={badungConversations}/></section>
   </>;
 }
 
@@ -265,10 +281,10 @@ function ServicePerformanceV3({navigate}:{navigate:(target:string)=>void}){
   </>;
 }
 
-function BadungOverview(){
+function BadungOverview({navigate}:{navigate:(target:string)=>void}){
   const [view,setView]=useState('Executive Summary');
   const views=['Executive Summary','Analisis Kecamatan','Demografi & Bahasa'];
-  return <><div className="overview-views" aria-label="Overview views">{views.map(item=><button key={item} className={view===item?'active':''} onClick={()=>setView(item)}>{item}</button>)}</div>{view==='Executive Summary'?<BadungOverviewSummary/>:view==='Analisis Kecamatan'?<DistrictAnalysis/>:<Demographics/>}</>;
+  return <><div className="overview-views" aria-label="Overview views">{views.map(item=><button key={item} className={view===item?'active':''} onClick={()=>setView(item)}>{item}</button>)}</div>{view==='Executive Summary'?<BadungOverviewSummary navigate={navigate}/>:view==='Analisis Kecamatan'?<DistrictAnalysis/>:<Demographics/>}</>;
 }
 
 function GovernmentConversations(){
@@ -311,7 +327,7 @@ function Dashboard() {
   const navItems=isValidation?["Overview","Validate Contact","Footprint Data","Batch Results","Methodology"]:isGovernment?governmentSections.flatMap(section=>section.items):nav;
   const labels:Record<string,string>=isValidation?{Overview:"Validation Overview","Validate Contact":"Validate Contact","Footprint Data":"Footprint Data","Batch Results":"Batch Results",Methodology:"Methodology"}:isGovernment?{Overview:"Overview",Conversations:"Aspirasi Warga",Topics:"Isu Daerah","Brand Analysis":"Kinerja Layanan","CCTV Intelligence":"CCTV Intelligence","Leader Image":"Citra Kepala Daerah","Data Sources":"Sumber Data",Findings:"Findings",Cases:"Cases","Media Monitoring":"Media Monitoring"}:{Overview:"Overview",Conversations:"Conversations",Topics:"Topics","Brand Analysis":"Brand Analysis","Competitor Analysis":"Competitor Analysis","Data Sources":"Data Sources"};
   const navigate=(target:string)=>{setActive(target);setMenu(false);};
-  const pages:Record<string,React.ReactNode>={Overview:isGovernment?<BadungOverview/>:<Overview/>,Conversations:isGovernment?<AspirasiWarga/>:<Conversations/>,Topics:isGovernment?<RegionalIssues/>:<Topics/>,"Brand Analysis":isGovernment?<ServicePerformanceV3 navigate={navigate}/>:<BrandAnalysis/>,"Competitor Analysis":isGovernment?<DistrictAnalysis/>:<Competitors/>,"Data Sources":<DataSources government={isGovernment}/>};
+  const pages:Record<string,React.ReactNode>={Overview:isGovernment?<BadungOverview navigate={navigate}/>:<Overview/>,Conversations:isGovernment?<AspirasiWarga/>:<Conversations/>,Topics:isGovernment?<RegionalIssues/>:<Topics/>,"Brand Analysis":isGovernment?<ServicePerformanceV3 navigate={navigate}/>:<BrandAnalysis/>,"Competitor Analysis":isGovernment?<DistrictAnalysis/>:<Competitors/>,"Data Sources":<DataSources government={isGovernment}/>};
   if(isGovernment){pages.Findings=<Findings/>;pages.Cases=<Cases/>;pages['CCTV Intelligence']=<CctvIntelligence/>;pages['Media Monitoring']=<MediaMonitoring navigate={navigate}/>;}
   pages["Leader Image"]=isGovernment?<LeaderImageV3/>:<LeaderImage/>;
   pages.Demographics=<Demographics/>;
