@@ -29,10 +29,6 @@ Screens clearly identify demonstration data and live provider responses.
 
 ## CCTV Intelligence
 
-The CCTV page works immediately with clearly labelled ATCS demonstration points. To enable live webcam discovery around Badung through Windy Webcams API V3, configure this server-side environment variable:
+The CCTV page embeds a small demo subset of the official public live streams from [ATCS Kota Denpasar](https://atcs.denpasarkota.go.id/streaming). No API key is required. The interface labels Denpasar as the provider and coverage area so the streams are not presented as cameras owned by Kabupaten Badung.
 
-```bash
-WINDY_WEBCAMS_API_KEY=your_windy_webcams_api_key
-```
-
-The key is only read by `app/api/cctv/route.ts` and is never returned to the browser.
+The official portal remains the source of truth for stream availability and its full 110-camera directory.
