@@ -11,9 +11,13 @@
     "start": "next start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test:crawler": "node scripts/smoke-crawler.mjs",
+    "crawler:once": "node --env-file=.env.local scripts/crawler-worker.mjs --once",
+    "crawler:watch": "node --env-file=.env.local scripts/crawler-worker.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "drizzle-orm": "0.45.2",
     "next": "16.2.6",
     "react": "19.2.6",

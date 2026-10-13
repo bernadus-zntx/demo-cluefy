@@ -25,10 +25,16 @@ Import this folder into Vercel. The default framework/build settings are suffici
 - Data Sources
 - CCTV Intelligence
 
-Screens clearly identify demonstration data and live provider responses.
+Government intelligence screens read connected data sources directly and show explicit empty states when a source has not been connected.
+
+## Supabase crawler ingestion
+
+Crawler configuration, run tracking, article ingestion, and deterministic deduplication are defined in `supabase/migrations/202610130001_crawler_ingestion.sql`. Apply that migration in Supabase, copy `.env.example` to `.env.local`, and configure the four environment values before starting the dashboard.
+
+The external crawler contract is documented in `docs/crawler-api.md`. The crawler uses a dedicated bearer token and never receives the Supabase service-role key. Run `npm run crawler:once` for one public-news cycle or `npm run crawler:watch` to poll every 10 minutes.
 
 ## CCTV Intelligence
 
-The CCTV page embeds a small demo subset of the official public live streams from [ATCS Kota Denpasar](https://atcs.denpasarkota.go.id/streaming). No API key is required. The interface labels Denpasar as the provider and coverage area so the streams are not presented as cameras owned by Kabupaten Badung.
+The CCTV page embeds a selected subset of the official public live streams from [ATCS Kota Denpasar](https://atcs.denpasarkota.go.id/streaming). No API key is required. The interface labels Denpasar as the provider and coverage area so the streams are not presented as cameras owned by Kabupaten Badung.
 
 The official portal remains the source of truth for stream availability and its full 110-camera directory.

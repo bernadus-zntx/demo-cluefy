@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./ara-assistant.module.css";
+import { useLiveIntelligence, type LiveItem } from "./intelligence/LiveIntelligence";
 
 type Message = {
   role: "ara" | "user";
@@ -27,7 +28,7 @@ const pageContexts: Record<string, PageContext> = {
     label: "Overview Kabupaten Badung",
     intro: "Saya bisa merangkum situasi publik dan menunjukkan prioritas hari ini.",
     suggestions: ["Ringkas situasi hari ini", "Apa isu paling mendesak?", "Bandingkan dengan periode lalu"],
-    answer: "Percakapan publik naik 10,4%. Kemacetan dan transportasi menjadi isu paling ramai, sementara 32 isu prioritas belum ditangani. Saya menyarankan tim memeriksa lonjakan keluhan koridor Kuta–Canggu dan antrean respons berprioritas tinggi.",
+    answer: "Saya akan merangkum volume, sentimen, topik, dan lokasi dari data live yang tersedia pada workspace.",
   },
   "Aspirasi Warga": {
     label: "Aspirasi Warga",
@@ -45,7 +46,7 @@ const pageContexts: Record<string, PageContext> = {
     label: "AI Findings",
     intro: "Saya bisa menguji kekuatan evidence, menjelaskan pola, dan menyarankan tindak lanjut.",
     suggestions: ["Finding mana paling kuat?", "Periksa evidence yang lemah", "Apa yang layak jadi Case?"],
-    answer: "Finding kemacetan koridor Kuta–Canggu memiliki pola lintas sumber dan evidence paling lengkap. Confidence tinggi, dampaknya meluas, dan sudah memiliki rekomendasi operasional sehingga paling siap untuk direview lalu dieskalasi menjadi Case.",
+    answer: "Saya akan membandingkan jumlah evidence, keragaman sumber, confidence, severity, dan status review dari Finding yang benar-benar tersedia.",
   },
   Cases: {
     label: "Case Management",
@@ -57,7 +58,7 @@ const pageContexts: Record<string, PageContext> = {
     label: "Kinerja Layanan",
     intro: "Saya bisa menemukan SLA rendah, layanan terpadat, dan kandidat Case.",
     suggestions: ["Layanan mana SLA-nya rendah?", "Apa layanan paling sering?", "Buat rekomendasi per OPD"],
-    answer: "Pengaduan Jalan & Drainase perlu perhatian khusus karena pencapaian SLA 61,8% terhadap target 85% dan memiliki backlog 42 layanan. Volume permohonan tertinggi tetap perlu dibandingkan dengan kapasitas tiap OPD sebelum dibuat Case.",
+    answer: "Saya akan membaca SLA, volume layanan, dan backlog setelah API layanan OPD terhubung.",
   },
   "CCTV Intelligence": {
     label: "CCTV Intelligence",
@@ -97,12 +98,45 @@ function answerFor(question: string, context: PageContext): string {
   return context.answer;
 }
 
+function topValue(items: LiveItem[], read: (item: LiveItem) => string | null) {
+  const counts = new Map<string, number>();
+  items.forEach(item => {
+    const value = read(item)?.trim();
+    if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+}
+
+function liveAnswer(activePage: string, items: LiveItem[], configured: boolean, loading: boolean, error: string | null) {
+  if (loading) return "Saya sedang memuat data terbaru dari workspace ini.";
+  if (error) return `Data live belum dapat saya baca: ${error}`;
+  if (!configured) return "Supabase belum terhubung, jadi saya belum dapat membuat ringkasan berbasis data aktual.";
+  if (!items.length) return "Belum ada konten yang diterima crawler. Saya tidak akan membuat angka atau kesimpulan sementara. Aktifkan worker crawler agar analisis halaman ini mulai terisi.";
+
+  const topic = topValue(items, item => item.topic);
+  const location = topValue(items, item => item.location);
+  const publisher = topValue(items, item => item.publisher || item.source);
+  const negative = items.filter(item => item.sentiment === "Negative").length;
+  const classified = items.filter(item => item.topic || item.sentiment || item.severity).length;
+  const base = `${items.length.toLocaleString("id-ID")} konten live tersedia; ${classified.toLocaleString("id-ID")} sudah memiliki klasifikasi AI`;
+
+  if (activePage === "Kinerja Layanan") return "Data API layanan OPD belum terhubung. Saya belum dapat menyebut SLA, volume layanan, atau backlog aktual sampai endpoint DPMPTSP, Bapenda, Dukcapil, dan OPD terkait tersedia.";
+  if (activePage === "Sumber Data") return `${base}. Sumber dengan kontribusi terbanyak saat ini adalah ${publisher ? `${publisher[0]} (${publisher[1]} konten)` : "belum teridentifikasi"}.`;
+  if (activePage === "Media Monitoring") return `${base}. Kontributor teratas saat ini ${publisher ? `${publisher[0]} dengan ${publisher[1]} konten` : "belum teridentifikasi"}.`;
+  if (activePage === "CCTV Intelligence") return "Status CCTV dibaca langsung dari public stream ATCS Kota Denpasar. Ketersediaan tiap tayangan tetap mengikuti provider resmi.";
+  return `${base}. ${negative.toLocaleString("id-ID")} konten bersentimen negatif${topic ? `, topik terbanyak ${topic[0]} (${topic[1]})` : ""}${location ? `, dan lokasi paling sering disebut ${location[0]} (${location[1]})` : ""}.`;
+}
+
 export function AraAssistant({ activePage }: { activePage: string }) {
+  const live = useLiveIntelligence();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const context = useMemo(() => pageContexts[activePage] ?? defaultContext, [activePage]);
+  const context = useMemo(() => {
+    const base = pageContexts[activePage] ?? defaultContext;
+    return {...base, answer: liveAnswer(activePage, live.items, live.configured, live.loading, live.error)};
+  }, [activePage, live.items, live.configured, live.loading, live.error]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();

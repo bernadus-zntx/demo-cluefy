@@ -1,7 +1,7 @@
 // @ts-nocheck -- legacy static demo datasets intentionally use mixed-value tuples.
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Cases, CasesProvider, useCases } from "./intelligence/Cases";
 import { FindingsProvider, Findings, ConversationActions, useFindings } from "./intelligence/Findings";
 import { MediaMonitoring } from "./intelligence/MediaMonitoring";
@@ -9,6 +9,9 @@ import { AspirasiWarga } from "./intelligence/AspirasiWarga";
 import { RegionalIssues } from "./intelligence/RegionalIssues";
 import { AraAssistant } from "./AraAssistant";
 import { CctvIntelligence } from "./intelligence/CctvIntelligence";
+import { CrawlerConfiguration } from "./intelligence/CrawlerConfiguration";
+import { formatLiveTime, LiveIntelligenceProvider, useLiveIntelligence, type LiveItem } from "./intelligence/LiveIntelligence";
+import { GovernmentLiveOverview, LiveLeaderImage, LiveServicePerformance } from "./intelligence/GovernmentLiveViews";
 
 const nav = ["Overview", "Conversations", "Topics", "Brand Analysis", "Competitor Analysis", "Data Sources"];
 
@@ -57,7 +60,7 @@ function Logo() {
 
 function Login({onLogin}:{onLogin:(segment:string)=>void}){
   const [account,setAccount]=useState("government");
-  return <div className="login-page"><div className="login-visual"><div className="login-logo"><div className="login-logo-crop"><img src="/cluefy-icon-exact.png" alt="ClueFy tree mark"/></div><div><b>ClueFy</b><span>Making clarity the new standard</span></div></div><div className="login-message"><span>SOCIAL INTELLIGENCE PLATFORM</span><h1>From conversations<br/>to <em>clarity.</em></h1><p>Understand what matters, respond with confidence, and make better decisions from every conversation.</p></div><div className="login-proof"><div><b>128K+</b><span>Conversations analyzed</span></div><div><b>7</b><span>Connected sources</span></div><div><b>24/7</b><span>Intelligence monitoring</span></div></div></div><div className="login-panel"><form onSubmit={e=>{e.preventDefault();onLogin(account)}}><div className="login-heading"><span>WELCOME BACK</span><h2>Sign in to ClueFy</h2><p>Choose your organization workspace to continue.</p></div><label className="login-field"><span>ORGANIZATION</span><select value={account} onChange={e=>setAccount(e.target.value)}><option value="government">Kabupaten Badung</option><option value="beauty">ClueBeauty Indonesia</option><option value="validation">OLX Indonesia · Validation</option></select></label><label className="login-field"><span>EMAIL ADDRESS</span><input type="email" defaultValue={account==="government"?"admin@badung.go.id":account==="validation"?"validation@olx.co.id":"admin@cluebeauty.id"} key={account} required/></label><label className="login-field"><span>PASSWORD</span><div className="password-wrap"><input type="password" defaultValue="cluefy-demo" required/><i>◉</i></div></label><div className="login-options"><label><input type="checkbox" defaultChecked/> Remember me</label><button type="button">Forgot password?</button></div><button className="login-submit" type="submit">Sign in to workspace <span>→</span></button><p className="demo-note"><i>i</i> Demo mode — choose any workspace with the pre-filled credentials.</p></form><div className="login-footer">© 2026 ClueFy Intelligence Platform</div></div></div>
+  return <div className="login-page"><div className="login-visual"><div className="login-logo"><div className="login-logo-crop"><img src="/cluefy-icon-exact.png" alt="ClueFy tree mark"/></div><div><b>ClueFy</b><span>Making clarity the new standard</span></div></div><div className="login-message"><span>SOCIAL INTELLIGENCE PLATFORM</span><h1>From conversations<br/>to <em>clarity.</em></h1><p>Understand what matters, respond with confidence, and make better decisions from every conversation.</p></div><div className="login-proof"><div><b>LIVE</b><span>Supabase data pipeline</span></div><div><b>URL</b><span>Source-linked evidence</span></div><div><b>AUDIT</b><span>Traceable intelligence</span></div></div></div><div className="login-panel"><form onSubmit={e=>{e.preventDefault();onLogin(account)}}><div className="login-heading"><span>WELCOME BACK</span><h2>Sign in to ClueFy</h2><p>Choose your organization workspace to continue.</p></div><label className="login-field"><span>ORGANIZATION</span><select value={account} onChange={e=>setAccount(e.target.value)}><option value="government">Kabupaten Badung</option><option value="beauty">ClueBeauty Indonesia</option><option value="validation">OLX Indonesia · Validation</option></select></label><label className="login-field"><span>EMAIL ADDRESS</span><input type="email" defaultValue={account==="government"?"admin@badung.go.id":account==="validation"?"validation@olx.co.id":"admin@cluebeauty.id"} key={account} required/></label><label className="login-field"><span>PASSWORD</span><div className="password-wrap"><input type="password" defaultValue="cluefy-demo" required/><i>◉</i></div></label><div className="login-options"><label><input type="checkbox" defaultChecked/> Remember me</label><button type="button">Forgot password?</button></div><button className="login-submit" type="submit">Sign in to workspace <span>→</span></button><p className="demo-note"><i>i</i> Live data mode — dashboard tidak menampilkan fallback dummy.</p></form><div className="login-footer">© 2026 ClueFy Intelligence Platform</div></div></div>
 }
 
 function MiniBars({ values = [30, 50, 44, 68, 61, 82, 76, 91] }: { values?: number[] }) {
@@ -169,59 +172,69 @@ function DataSources({government=false}:{government?:boolean}){
 }
 
 function GovernmentDataSources(){
-  const [sourceView,setSourceView]=useState("social");
+  const [section,setSection]=useState<"directory"|"crawler">("directory");
+  const [sourceView,setSourceView]=useState<"social"|"media"|"authors">("social");
   const [sourceQuery,setSourceQuery]=useState("");
-  const socialSources=[
-    {name:"Instagram",detail:"@pemkabbadung",country:"Indonesia",origin:"Badung, Bali",status:"Terhubung",volume:"9.842",sync:"5 menit lalu",initial:"IG",tone:"instagram"},
-    {name:"Facebook",detail:"Pemkab Badung",country:"Indonesia",origin:"Badung, Bali",status:"Terhubung",volume:"6.914",sync:"8 menit lalu",initial:"FB",tone:"facebook"},
-    {name:"TikTok",detail:"Topik Kabupaten Badung",country:"Indonesia",origin:"Bali",status:"Terhubung",volume:"4.286",sync:"12 menit lalu",initial:"TT",tone:"tiktok"},
-    {name:"X / Twitter",detail:"Kata kunci isu daerah",country:"Indonesia",origin:"Bali",status:"Dijeda",volume:"2.438",sync:"2 hari lalu",initial:"X",tone:"twitter"},
-    {name:"Instagram",detail:"Bali Travel Forum",country:"Australia",origin:"Sydney, Australia",status:"Terhubung",volume:"1.824",sync:"21 menit lalu",initial:"IG",tone:"instagram"},
-    {name:"YouTube",detail:"Bali Tourism Update",country:"Singapura",origin:"Singapore",status:"Terhubung",volume:"1.106",sync:"34 menit lalu",initial:"YT",tone:"youtube"},
-  ];
-  const mediaSources=[
-    {name:"Bali Post",detail:"Media Online & Print",country:"Indonesia",origin:"Denpasar, Bali",status:"Terpantau",volume:"428",sync:"3 menit lalu",initial:"BP"},
-    {name:"Tribun Bali",detail:"Media Online",country:"Indonesia",origin:"Denpasar, Bali",status:"Terpantau",volume:"376",sync:"6 menit lalu",initial:"TB"},
-    {name:"detikBali",detail:"Media Online",country:"Indonesia",origin:"Bali",status:"Terpantau",volume:"312",sync:"4 menit lalu",initial:"DB"},
-    {name:"ANTARA Bali",detail:"Kantor Berita",country:"Indonesia",origin:"Denpasar, Bali",status:"Terpantau",volume:"267",sync:"9 menit lalu",initial:"AB"},
-    {name:"Kompas.com",detail:"Media Online Nasional",country:"Indonesia",origin:"Jakarta",status:"Terpantau",volume:"219",sync:"7 menit lalu",initial:"KO"},
-    {name:"Mongabay Indonesia",detail:"Media Lingkungan",country:"Indonesia",origin:"Jakarta",status:"Terpantau",volume:"146",sync:"18 menit lalu",initial:"MI"},
-  ];
-  const authorSources=[
-    {name:"Ayu Lestari",detail:"Bali Post · Kompas.com · Freelance",country:"Indonesia",origin:"Denpasar, Bali",status:"Teridentifikasi",volume:"31",media:"3 media",initial:"AL"},
-    {name:"I Made Surya Wijaya",detail:"Tribun Bali · Bali Post · Freelance",country:"Indonesia",origin:"Badung, Bali",status:"Teridentifikasi",volume:"24",media:"3 media",initial:"MS"},
-    {name:"Raka Putra",detail:"detikBali · ANTARA Bali · Freelance",country:"Indonesia",origin:"Bali",status:"Teridentifikasi",volume:"21",media:"3 media",initial:"RP"},
-    {name:"Ni Luh Diah Prameswari",detail:"Bali Post · Mongabay · Freelance",country:"Indonesia",origin:"Badung, Bali",status:"Teridentifikasi",volume:"19",media:"3 media",initial:"ND"},
-    {name:"Kadek Mahendra",detail:"Tribun Bali · Kompas.com · Freelance",country:"Indonesia",origin:"Denpasar, Bali",status:"Teridentifikasi",volume:"18",media:"3 media",initial:"KM"},
-  ];
-  const activeRows=sourceView==="social"?socialSources:sourceView==="media"?mediaSources:authorSources;
+  const live=useLiveIntelligence();
+  const liveItems=live.items;
+  const isSocial=(value:string)=>/instagram|facebook|tiktok|youtube|reddit|twitter|\bx\b|social|telegram/.test(value.toLowerCase());
+  const initials=(value:string)=>value.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase()||'—';
+  const rows=useMemo(()=>{
+    type DirectoryRow={name:string;detail:string;country:string;origin:string;status:string;volume:number;sync:string;initial:string;tone:string;media?:string};
+    const group=(keyFor:(item:LiveItem)=>string|null, include:(item:LiveItem)=>boolean, authorMode=false)=>{
+      const map=new Map<string,{items:LiveItem[];media:Set<string>}>();
+      liveItems.filter(include).forEach(item=>{
+        const key=keyFor(item)?.trim();if(!key)return;
+        const current=map.get(key)||{items:[],media:new Set<string>()};current.items.push(item);if(item.publisher)current.media.add(item.publisher);map.set(key,current);
+      });
+      return [...map.entries()].map(([name,value]):DirectoryRow=>{
+        const latest=[...value.items].sort((a,b)=>new Date(b.lastSeenAt).getTime()-new Date(a.lastSeenAt).getTime())[0];
+        const platforms=Array.from(new Set(value.items.map(item=>item.platform||item.source))).filter(Boolean);
+        return {name,detail:authorMode?(value.media.size?[...value.media].slice(0,3).join(' · '):platforms.join(' · ')):platforms.join(' · '),country:latest.country||'Belum tersedia',origin:latest.location||latest.source||'Belum tersedia',status:'Live',volume:value.items.length,sync:formatLiveTime(latest.lastSeenAt),initial:initials(name),tone:(latest.platform||latest.source).toLowerCase(),media:authorMode?`${value.media.size} media`:undefined};
+      }).sort((a,b)=>b.volume-a.volume);
+    };
+    return {
+      social:group(item=>item.platform||item.source,item=>isSocial(`${item.platform||''} ${item.source}`)),
+      media:group(item=>item.publisher||item.source,item=>!isSocial(`${item.platform||''} ${item.source}`)),
+      authors:group(item=>item.author,item=>Boolean(item.author),true),
+    };
+  },[liveItems]);
+  const activeRows=rows[sourceView];
   const filteredRows=activeRows.filter(item=>`${item.name} ${item.detail} ${item.country} ${item.origin}`.toLowerCase().includes(sourceQuery.toLowerCase()));
+  const countries=new Set(liveItems.map(item=>item.country).filter(Boolean)).size;
   const volumeLabel=sourceView==="authors"?"ARTIKEL":"KONTEN";
   return <>
-    <div className="source-top source-intel-top"><div><span className="source-eyebrow">SOURCE INTELLIGENCE</span><h2>Sumber Data</h2><p>Kelola social media, media, dan penulis yang dipantau beserta negara dan asal sumber.</p></div><button className="primary">＋ Tambah sumber data</button></div>
-    <div className="source-summary source-intel-summary"><span><b>6</b> kanal social media</span><span><b>186</b> media terpantau</span><span><b>342</b> penulis teridentifikasi</span><span><b>11</b> negara asal</span></div>
+    <div className="source-top source-intel-top"><div><span className="source-eyebrow">SOURCE INTELLIGENCE</span><h2>Sumber Data</h2><p>Direktori aktual dari konten crawler dan konfigurasi target ClueFy.</p></div>{section==="directory"&&<button className="primary" onClick={()=>void live.refresh()}>↻ Refresh data live</button>}</div>
+    <div className="source-workspace-tabs" role="tablist" aria-label="Pengelolaan sumber data">
+      <button className={section==="directory"?"active":""} onClick={()=>setSection("directory")} role="tab" aria-selected={section==="directory"}><i>▤</i><span><b>Direktori Sumber</b><small>Media, akun, dan penulis dari data aktual</small></span></button>
+      <button className={section==="crawler"?"active":""} onClick={()=>setSection("crawler")} role="tab" aria-selected={section==="crawler"}><i>⌁</i><span><b>Konfigurasi Crawler</b><small>URL, keyword, hashtag, penulis, akun, dan group</small></span><em>LIVE</em></button>
+    </div>
+    {section==="crawler"?<CrawlerConfiguration/>:<>
+    <div className="real-data-notice"><span>{live.error?'!':'✓'}</span><div><b>{live.error?'Koneksi bermasalah':live.configured?'Direktori membaca Supabase':'Supabase belum terhubung'}</b><p>{live.error||`${liveItems.length.toLocaleString('id-ID')} konten tersimpan. Direktori tidak menampilkan sumber contoh.`}</p></div></div>
+    <div className="source-summary source-intel-summary"><span><b>{rows.social.length}</b> kanal social media</span><span><b>{rows.media.length}</b> media terpantau</span><span><b>{rows.authors.length}</b> penulis teridentifikasi</span><span><b>{countries}</b> negara asal</span></div>
     <div className="source-category-tabs" role="tablist" aria-label="Kategori sumber data">
-      <button className={sourceView==="social"?"active":""} onClick={()=>setSourceView("social")} role="tab" aria-selected={sourceView==="social"}><i>◎</i><span><b>Social Media</b><small>Akun dan kanal percakapan publik</small></span><em>6</em></button>
-      <button className={sourceView==="media"?"active":""} onClick={()=>setSourceView("media")} role="tab" aria-selected={sourceView==="media"}><i>▤</i><span><b>Media</b><small>Portal berita dan publikasi</small></span><em>186</em></button>
-      <button className={sourceView==="authors"?"active":""} onClick={()=>setSourceView("authors")} role="tab" aria-selected={sourceView==="authors"}><i>✎</i><span><b>Penulis</b><small>Kontributor lintas media</small></span><em>342</em></button>
+      <button className={sourceView==="social"?"active":""} onClick={()=>setSourceView("social")} role="tab" aria-selected={sourceView==="social"}><i>◎</i><span><b>Social Media</b><small>Akun dan kanal percakapan publik</small></span><em>{rows.social.length}</em></button>
+      <button className={sourceView==="media"?"active":""} onClick={()=>setSourceView("media")} role="tab" aria-selected={sourceView==="media"}><i>▤</i><span><b>Media</b><small>Portal berita dan publikasi</small></span><em>{rows.media.length}</em></button>
+      <button className={sourceView==="authors"?"active":""} onClick={()=>setSourceView("authors")} role="tab" aria-selected={sourceView==="authors"}><i>✎</i><span><b>Penulis</b><small>Kontributor lintas media</small></span><em>{rows.authors.length}</em></button>
     </div>
     <section className="card source-directory">
-      <div className="source-directory-head"><div><h3>{sourceView==="social"?"Social Media":sourceView==="media"?"Media terpantau":"Direktori penulis"}</h3><p>{sourceView==="authors"?"Penulis dapat terhubung dengan lebih dari satu media.":"Negara dan asal membantu membaca konteks geografis setiap sumber."}</p></div><div className="source-search">⌕ <input value={sourceQuery} onChange={event=>setSourceQuery(event.target.value)} placeholder={`Cari ${sourceView==="authors"?"penulis":"sumber"}...`} aria-label="Cari sumber data"/></div></div>
+      <div className="source-directory-head"><div><h3>{sourceView==="social"?"Social Media":sourceView==="media"?"Media terpantau":"Direktori penulis"}</h3><p>{sourceView==="authors"?"Relasi penulis dan media dihitung dari artikel yang tersimpan.":"Negara dan asal ditampilkan jika tersedia pada metadata sumber."}</p></div><div className="source-search">⌕ <input value={sourceQuery} onChange={event=>setSourceQuery(event.target.value)} placeholder={`Cari ${sourceView==="authors"?"penulis":"sumber"}...`} aria-label="Cari sumber data"/></div></div>
       <div className={`source-list ${sourceView==="authors"?"authors":""}`}>
-        <div className="source-list-row source-list-head"><span>{sourceView==="authors"?"PENULIS":"SUMBER / AKUN"}</span><span>NEGARA</span><span>ASAL</span>{sourceView==="authors"&&<span>MEDIA</span>}<span>STATUS</span><span>{volumeLabel}</span>{sourceView!=="authors"&&<span>LAST SYNC</span>}</div>
+        <div className="source-list-row source-list-head"><span>{sourceView==="authors"?"PENULIS":"SUMBER / AKUN"}</span><span>NEGARA</span><span>ASAL</span>{sourceView==="authors"&&<span>MEDIA</span>}<span>STATUS</span><span>{volumeLabel}</span>{sourceView!=="authors"&&<span>LAST SEEN</span>}</div>
         {filteredRows.map((item,index)=><div className="source-list-row source-list-item" key={`${item.name}-${index}`}>
-          <span className="source-entity"><i className={`source-directory-avatar ${item.tone||""}`}>{item.initial}</i><span><b>{item.name}</b><small>{item.detail}</small></span></span>
-          <span className="source-country"><i>{item.country==="Indonesia"?"🇮🇩":item.country==="Australia"?"🇦🇺":"🇸🇬"}</i><b>{item.country}</b></span>
+          <span className="source-entity"><i className={`source-directory-avatar ${item.tone||""}`}>{item.initial}</i><span><b>{item.name}</b><small>{item.detail||'Metadata kanal belum tersedia'}</small></span></span>
+          <span className="source-country"><i>◉</i><b>{item.country}</b></span>
           <span className="source-origin">{item.origin}</span>
           {sourceView==="authors"&&<span className="source-media-count">{item.media}</span>}
-          <span><em className={`connection ${item.status==="Dijeda"?"paused":""}`}>● {item.status}</em></span>
-          <span className="source-volume"><b>{item.volume}</b><small>{sourceView==="authors"?"artikel":"konten"}</small></span>
-          {sourceView!=="authors"&&<span className="source-sync">{item.sync||""}</span>}
+          <span><em className="connection">● {item.status}</em></span>
+          <span className="source-volume"><b>{item.volume.toLocaleString('id-ID')}</b><small>{sourceView==="authors"?"artikel":"konten"}</small></span>
+          {sourceView!=="authors"&&<span className="source-sync">{item.sync}</span>}
         </div>)}
-        {filteredRows.length===0&&<div className="source-empty">Tidak ada sumber yang cocok dengan pencarian.</div>}
+        {filteredRows.length===0&&<div className="source-empty">{live.loading?'Memuat direktori live…':'Belum ada sumber aktual pada kategori ini.'}</div>}
       </div>
     </section>
-    <div className="source-method-note"><span>i</span><p><b>Tentang negara & asal</b> Data berasal dari metadata publik media, akun, dan byline. Untuk penulis independen, asal menunjukkan lokasi publik yang teridentifikasi.</p></div>
+    <div className="source-method-note"><span>i</span><p><b>Tentang negara &amp; asal</b> Nilai hanya ditampilkan dari metadata publik yang diterima crawler. Metadata yang tidak tersedia tidak ditebak.</p></div>
+    </>}
   </>;
 }
 
@@ -327,17 +340,17 @@ function Dashboard() {
   const navItems=isValidation?["Overview","Validate Contact","Footprint Data","Batch Results","Methodology"]:isGovernment?governmentSections.flatMap(section=>section.items):nav;
   const labels:Record<string,string>=isValidation?{Overview:"Validation Overview","Validate Contact":"Validate Contact","Footprint Data":"Footprint Data","Batch Results":"Batch Results",Methodology:"Methodology"}:isGovernment?{Overview:"Overview",Conversations:"Aspirasi Warga",Topics:"Isu Daerah","Brand Analysis":"Kinerja Layanan","CCTV Intelligence":"CCTV Intelligence","Leader Image":"Citra Kepala Daerah","Data Sources":"Sumber Data",Findings:"Findings",Cases:"Cases","Media Monitoring":"Media Monitoring"}:{Overview:"Overview",Conversations:"Conversations",Topics:"Topics","Brand Analysis":"Brand Analysis","Competitor Analysis":"Competitor Analysis","Data Sources":"Data Sources"};
   const navigate=(target:string)=>{setActive(target);setMenu(false);};
-  const pages:Record<string,React.ReactNode>={Overview:isGovernment?<BadungOverview navigate={navigate}/>:<Overview/>,Conversations:isGovernment?<AspirasiWarga/>:<Conversations/>,Topics:isGovernment?<RegionalIssues/>:<Topics/>,"Brand Analysis":isGovernment?<ServicePerformanceV3 navigate={navigate}/>:<BrandAnalysis/>,"Competitor Analysis":isGovernment?<DistrictAnalysis/>:<Competitors/>,"Data Sources":<DataSources government={isGovernment}/>};
+  const pages:Record<string,React.ReactNode>={Overview:isGovernment?<GovernmentLiveOverview navigate={navigate}/>:<Overview/>,Conversations:isGovernment?<AspirasiWarga/>:<Conversations/>,Topics:isGovernment?<RegionalIssues/>:<Topics/>,"Brand Analysis":isGovernment?<LiveServicePerformance/>:<BrandAnalysis/>,"Competitor Analysis":isGovernment?<DistrictAnalysis/>:<Competitors/>,"Data Sources":<DataSources government={isGovernment}/>};
   if(isGovernment){pages.Findings=<Findings/>;pages.Cases=<Cases/>;pages['CCTV Intelligence']=<CctvIntelligence/>;pages['Media Monitoring']=<MediaMonitoring navigate={navigate}/>;}
-  pages["Leader Image"]=isGovernment?<LeaderImageV3/>:<LeaderImage/>;
+  pages["Leader Image"]=isGovernment?<LiveLeaderImage/>:<LeaderImage/>;
   pages.Demographics=<Demographics/>;
   if(isValidation){pages.Overview=<><ExternalScoreBanner/><ValidationOverview/></>;pages["Validate Contact"]=<ValidateContact/>;pages["Footprint Data"]=<FootprintData/>;pages["Batch Results"]=<BatchResults/>;pages.Methodology=<ValidationMethodology/>}
   const workspaceName=isValidation?"OLX Indonesia":isGovernment?"Kabupaten Badung":"ClueBeauty Indonesia";
   const segmentName=isValidation?"DATA VALIDATION":isGovernment?"PUBLIC SECTOR":"CONSUMER & BEAUTY";
   return <div className="app-shell">
     <aside className={menu?"open":""}><Logo/><div className="workspace"><span>{isValidation?"O":isGovernment?"B":"C"}</span><div><small>ACTIVE SEGMENT</small><b>{workspaceName}</b></div></div><nav>{isGovernment?governmentSections.map(section=><div className="nav-section" key={section.label||'overview'}>{section.label&&<small>{section.label}</small>}{section.items.map(n=><button key={n} className={active===n?"active":""} onClick={()=>navigate(n)}><i>{icons[n]}</i><span className="nav-label"><span>{labels[n]}</span>{n==='Findings'&&<em>AI-powered synthesis</em>}</span></button>)}</div>):navItems.map(n=><button key={n} className={active===n?"active":""} onClick={()=>navigate(n)}><i>{icons[n]}</i>{labels[n]}</button>)}</nav><div className="sidebar-bottom"><button><i>?</i> Help Center</button><button><i>⚙</i> Settings</button><button onClick={()=>setLoggedIn(false)}><i>↪</i> Sign out</button><div className="user"><span>BS</span><div><b>Budi Santoso</b><small>{isValidation?"Validation Admin":isGovernment?"Badung Admin":"Brand Admin"}</small></div><button>•••</button></div></div></aside>
-    {menu&&<button className="scrim" aria-label="Close menu" onClick={()=>setMenu(false)}/>}<main><header><button className="menu-btn" aria-label="Open menu" onClick={()=>setMenu(true)}>☰</button><div><h1>{labels[active]}</h1><p>{isValidation?(active==="Overview"?"Privacy-safe external contact intelligence.":"Validate and review external footprint signals."):active==="Overview"?(isGovernment?"Pusat intelijen publik Kabupaten Badung.":"Your social intelligence command center."):active==='Findings'?"AI menemukan pola masalah berulang dari berbagai aspirasi dan sumber.":active==='CCTV Intelligence'?"Pantau kamera publik, koneksi, dan konteks lalu lintas secara terpusat.":`Explore ${labels[active].toLowerCase()} insights across connected channels.`}</p></div><div className="header-actions"><div className="segment-chip"><span>{segmentName}</span><b>{workspaceName}</b></div><button className="date">◷ Last 28 days⌄</button><button className="notification">♢<i/></button><span className="header-avatar">BS</span></div></header><div className="content">{pages[active]}</div><footer>Data refreshed 4 minutes ago <span>•</span> ClueFy Intelligence Platform</footer></main>{isGovernment&&<AraAssistant key={active} activePage={labels[active]}/>}
+    {menu&&<button className="scrim" aria-label="Close menu" onClick={()=>setMenu(false)}/>}<main><header><button className="menu-btn" aria-label="Open menu" onClick={()=>setMenu(true)}>☰</button><div><h1>{labels[active]}</h1><p>{isValidation?(active==="Overview"?"Privacy-safe external contact intelligence.":"Validate and review external footprint signals."):active==="Overview"?(isGovernment?"Pusat intelijen publik Kabupaten Badung.":"Your social intelligence command center."):active==='Findings'?"AI menemukan pola masalah berulang dari berbagai aspirasi dan sumber.":active==='CCTV Intelligence'?"Pantau kamera publik, koneksi, dan konteks lalu lintas secara terpusat.":`Explore ${labels[active].toLowerCase()} insights across connected channels.`}</p></div><div className="header-actions"><div className="segment-chip"><span>{segmentName}</span><b>{workspaceName}</b></div><button className="date">◷ Last 28 days⌄</button><button className="notification">♢<i/></button><span className="header-avatar">BS</span></div></header><div className="content">{pages[active]}</div><footer>Live data from connected sources <span>•</span> ClueFy Intelligence Platform</footer></main>{isGovernment&&<AraAssistant key={active} activePage={labels[active]}/>}
   </div>;
 }
 
-export default function Home(){return <CasesProvider><FindingsProvider><Dashboard/></FindingsProvider></CasesProvider>;}
+export default function Home(){return <LiveIntelligenceProvider><CasesProvider><FindingsProvider><Dashboard/></FindingsProvider></CasesProvider></LiveIntelligenceProvider>;}

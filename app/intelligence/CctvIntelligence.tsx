@@ -158,7 +158,7 @@ export function CctvIntelligence() {
 
   return <>
     <div className={styles.hero}>
-      <div><span>CCTV & TRAFFIC INTELLIGENCE</span><h2>Live CCTV Kota Denpasar</h2><p>Sumber pembanding terdekat untuk demo ClueFy Kabupaten Badung, langsung dari ATCS resmi.</p></div>
+      <div><span>CCTV & TRAFFIC INTELLIGENCE</span><h2>Live CCTV Kota Denpasar</h2><p>Sumber pembanding terdekat untuk ClueFy Kabupaten Badung, langsung dari ATCS resmi.</p></div>
       <div className={`${styles.modeBadge} ${styles.live}`}><i/>LIVE · PUBLIC STREAM</div>
     </div>
 
@@ -169,7 +169,7 @@ export function CctvIntelligence() {
 
     {tab === "monitor" ? <>
       <div className={styles.kpis}>
-        <article><small>Kamera Demo</small><strong>{cameras.length}</strong><p>Dipilih dari direktori resmi</p></article>
+        <article><small>Kamera Terpilih</small><strong>{cameras.length}</strong><p>Dipilih dari direktori resmi</p></article>
         <article className={styles.onlineKpi}><small>Live Tersedia</small><strong>{online}</strong><p>Public stream ATCS</p></article>
         <article><small>Direktori Resmi</small><strong>110</strong><p>CCTV Kota Denpasar</p></article>
         <article><small>Provider Aktif</small><strong>ATCS</strong><p>Dishub Kota Denpasar</p></article>
@@ -190,7 +190,7 @@ export function CctvIntelligence() {
         </section>
 
         <section className={styles.mapCard}>
-          <div className={styles.sectionTitle}><div><h3>Peta Kamera Demo</h3><p>Enam titik live di wilayah Kota Denpasar</p></div><span>{cameras.length} titik</span></div>
+          <div className={styles.sectionTitle}><div><h3>Peta Kamera</h3><p>Enam titik live di wilayah Kota Denpasar</p></div><span>{cameras.length} titik</span></div>
           <div className={styles.map}>
             <span className={styles.coast}>KOTA<br/><b>DENPASAR</b></span>
             <i className={styles.roadOne}/><i className={styles.roadTwo}/>
@@ -201,7 +201,7 @@ export function CctvIntelligence() {
       </div>
 
       <section className={styles.directory}>
-        <div className={styles.directoryHead}><div><h3>Direktori CCTV Demo</h3><p>Klik kamera untuk mengganti live player di atas.</p></div><div className={styles.tools}><label>⌕<input value={query} onChange={event => setQuery(event.target.value)} placeholder="Cari kamera atau lokasi…"/></label><select value={filter} onChange={event => setFilter(event.target.value as "all" | CameraStatus)}><option value="all">Semua status</option><option value="active">Live tersedia</option><option value="inactive">Tidak tersedia</option><option value="connecting">Menghubungkan</option><option value="standby">Standby</option></select></div></div>
+        <div className={styles.directoryHead}><div><h3>Direktori CCTV</h3><p>Klik kamera untuk mengganti live player di atas.</p></div><div className={styles.tools}><label>⌕<input value={query} onChange={event => setQuery(event.target.value)} placeholder="Cari kamera atau lokasi…"/></label><select value={filter} onChange={event => setFilter(event.target.value as "all" | CameraStatus)}><option value="all">Semua status</option><option value="active">Live tersedia</option><option value="inactive">Tidak tersedia</option><option value="connecting">Menghubungkan</option><option value="standby">Standby</option></select></div></div>
         <div className={styles.listHead}><span>KAMERA / LOKASI</span><span>PROVIDER</span><span>STATUS</span><span>WILAYAH</span><span/></div>
         {filtered.map(camera => <button className={`${styles.cameraRow} ${selected.id === camera.id ? styles.selectedRow : ""}`} key={camera.id} onClick={() => selectCamera(camera.id)}><span><i>◉</i><b>{camera.name}<small>{camera.note}</small></b></span><span>{camera.provider}</span><span className={`${styles.rowStatus} ${styles[camera.status]}`}><i/>{statusLabels[camera.status]}</span><span>{camera.city}</span><span>Watch →</span></button>)}
         {!filtered.length && <p className={styles.empty}>Tidak ada kamera yang sesuai dengan filter.</p>}
@@ -210,17 +210,17 @@ export function CctvIntelligence() {
       <section className={styles.connectionCard}>
         <div className={styles.connectionTitle}><span className={`${styles.baliIcon} ${styles.connectedIcon}`}>D</span><div><h3>ATCS Kota Denpasar</h3><p>Live streaming publik resmi Dinas Perhubungan Kota Denpasar.</p></div><span className={`${styles.connectionPill} ${styles.connectedPill}`}>LIVE SOURCE</span></div>
         <div className={styles.connectionFacts}><div><small>DIRECTORY</small><b>110 CCTV terpasang</b></div><div><small>AUTHENTICATION</small><b>Tidak memerlukan API key</b></div><div><small>INTEGRATION</small><b>Official HLS live stream</b></div><div><small>OWNER</small><b>Dishub Kota Denpasar</b></div></div>
-        <div className={styles.connectionMessage}><span>✓</span><p><b>Sumber live siap dipakai untuk demo.</b> ClueFy membuka player resmi ATCS pada kamera yang dipilih. Ketersediaan video mengikuti layanan milik provider.</p></div>
+        <div className={styles.connectionMessage}><span>✓</span><p><b>Sumber live siap dipakai.</b> ClueFy membuka player resmi ATCS pada kamera yang dipilih. Ketersediaan video mengikuti layanan milik provider.</p></div>
         <div className={styles.connectionActions}><a className={styles.primaryLink} href={officialStreamingUrl} target="_blank" rel="noreferrer">Buka 110 Kamera ↗</a><a href={selected.playerUrl} target="_blank" rel="noreferrer">Tes Kamera Terpilih ↗</a></div>
       </section>
 
       <section className={styles.connectionCard}>
-        <div className={styles.connectionTitle}><span className={styles.scopeIcon}>i</span><div><h3>Cakupan Demo</h3><p>Pemisahan wilayah dan sumber data ditampilkan secara eksplisit.</p></div><span className={`${styles.connectionPill} ${styles.publicPill}`}>DENPASAR</span></div>
-        <div className={styles.connectionFacts}><div><small>WORKSPACE</small><b>Kabupaten Badung</b></div><div><small>LIVE PROVIDER</small><b>Kota Denpasar</b></div><div><small>USE IN DEMO</small><b>Nearby traffic reference</b></div><div><small>BADUNG LIVE</small><b>Menunggu akses resmi</b></div></div>
-        <div className={styles.connectionMessage}><span>i</span><p><b>Tidak diklaim sebagai kamera Badung.</b> Kamera Denpasar dipakai sebagai contoh integrasi live. Saat akses Dishub Badung tersedia, provider dapat ditambahkan tanpa mengubah pengalaman pengguna.</p></div>
+        <div className={styles.connectionTitle}><span className={styles.scopeIcon}>i</span><div><h3>Cakupan Integrasi</h3><p>Pemisahan wilayah dan sumber data ditampilkan secara eksplisit.</p></div><span className={`${styles.connectionPill} ${styles.publicPill}`}>DENPASAR</span></div>
+        <div className={styles.connectionFacts}><div><small>WORKSPACE</small><b>Kabupaten Badung</b></div><div><small>LIVE PROVIDER</small><b>Kota Denpasar</b></div><div><small>USE IN CLUEFY</small><b>Nearby traffic reference</b></div><div><small>BADUNG LIVE</small><b>Menunggu akses resmi</b></div></div>
+        <div className={styles.connectionMessage}><span>i</span><p><b>Tidak diklaim sebagai kamera Badung.</b> Kamera Denpasar dipakai sebagai sumber pembanding live. Saat akses Dishub Badung tersedia, provider dapat ditambahkan tanpa mengubah pengalaman pengguna.</p></div>
       </section>
     </div>}
 
-    <div className={styles.sourceNote}><span>i</span><p><b>Sumber resmi.</b> Video ditayangkan dari public live player ATCS Kota Denpasar. Enam kamera dipilih untuk menjaga demo tetap ringan; direktori lengkap menyediakan 110 titik. Status dan kontinuitas tayangan mengikuti layanan Dishub Kota Denpasar.</p></div>
+    <div className={styles.sourceNote}><span>i</span><p><b>Sumber resmi.</b> Video ditayangkan dari public live player ATCS Kota Denpasar. Enam kamera dipilih untuk menjaga dashboard tetap ringan; direktori lengkap menyediakan 110 titik. Status dan kontinuitas tayangan mengikuti layanan Dishub Kota Denpasar.</p></div>
   </>;
 }

@@ -114,7 +114,7 @@ export type Command =
   | { type: 'distribute'; reason: string; destination: string; message: string }
   | { type: 'draft_communication'; reason: string; format: CommunicationFormat; content: string };
 
-const reviewer = 'Budi Santoso · reviewer demo';
+const reviewer = 'Budi Santoso';
 
 export function activeRevision(finding: Finding): AnalysisRevision {
   const revision = finding.revisions.find(item => item.id === finding.activeRevisionId);
@@ -295,7 +295,7 @@ export function createFinding(id: string, input: EvidenceInput, issue: string, s
   const revision: AnalysisRevision = {
     id: `${id}-REV-001`, number: 1, title, analysis, summary: analysis, recommendation: 'Verifikasi konteks sumber dan kondisi lapangan sebelum menentukan respons.', issue, location: 'Kabupaten Badung', entities: ['Pemkab Badung'], sentiment, emotion: sentiment === 'Negative' ? 'Frustration' : 'Concern', confidence: 84,
     severity: sentiment === 'Negative' ? 'High' : 'Medium',
-    reason: 'Analisis AI simulasi; belum diverifikasi manusia.', createdBy: 'AI demo', createdAt: at, evidenceIds: [evidenceId],
+    reason: 'Analisis AI awal; belum diverifikasi manusia.', createdBy: 'ClueFy AI', createdAt: at, evidenceIds: [evidenceId],
   };
   const finding: Finding = {
     id, workspaceId: 'government', title, issue, entities: revision.entities, sentiment, severity: revision.severity, location: revision.location,
@@ -303,6 +303,6 @@ export function createFinding(id: string, input: EvidenceInput, issue: string, s
   };
   return {
     ...finding,
-    auditEvents: [{ id: `${id}-AUD-001`, actor: 'AI demo', action: 'created', createdAt: at, note: revision.reason, before: null, after: snapshot(finding) }],
+    auditEvents: [{ id: `${id}-AUD-001`, actor: 'ClueFy AI', action: 'created', createdAt: at, note: revision.reason, before: null, after: snapshot(finding) }],
   };
 }
