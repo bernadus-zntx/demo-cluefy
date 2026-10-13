@@ -29,6 +29,12 @@ function text(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function isRelevantItem(row: CrawlRow) {
+  if (row.platform !== "Media Asing") return true;
+  const content = `${row.title} ${row.excerpt ?? ""} ${row.body ?? ""}`;
+  return /badung|kuta|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan|bali|バリ|クタ|チャングー|バドゥン/i.test(content);
+}
+
 function itemFromRow(row: CrawlRow) {
   const raw = row.raw_payload ?? {};
   const ai = typeof raw.ai === "object" && raw.ai ? raw.ai as Record<string, unknown> : {};
@@ -90,7 +96,7 @@ export async function GET() {
   return NextResponse.json({
     configured: true,
     generatedAt: new Date().toISOString(),
-    items: (itemsResult.data ?? []).map(row => itemFromRow(row as CrawlRow)),
+    items: (itemsResult.data ?? []).filter(row => isRelevantItem(row as CrawlRow)).map(row => itemFromRow(row as CrawlRow)),
     rules: rulesResult.data ?? [],
     runs: runsResult.data ?? [],
   }, { headers: { "Cache-Control": "private, no-store" } });

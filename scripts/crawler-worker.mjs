@@ -27,39 +27,63 @@ function source(block) {
   return text(block.match(/<source(?:\s[^>]*)?>([\s\S]*?)<\/source>/i)?.[1] || "");
 }
 
-function feedQuery(rule) {
+function feedProfile(rule) {
+  const hint = `${rule.source || ""} ${rule.scope || ""} ${rule.note || ""}`.toLowerCase();
+  const profiles = [
+    { match: /jepang|japan|japanese|日本|日本語/, hl: "ja", gl: "JP", ceid: "JP:ja", language: "ja", country: "Jepang" },
+    { match: /prancis|france|french|français/, hl: "fr", gl: "FR", ceid: "FR:fr", language: "fr", country: "Prancis" },
+    { match: /jerman|germany|german|deutsch/, hl: "de", gl: "DE", ceid: "DE:de", language: "de", country: "Jerman" },
+    { match: /hong kong/, hl: "en-HK", gl: "HK", ceid: "HK:en", language: "en", country: "Hong Kong" },
+    { match: /singapura|singapore/, hl: "en-SG", gl: "SG", ceid: "SG:en", language: "en", country: "Singapura" },
+    { match: /inggris|united kingdom|british/, hl: "en-GB", gl: "GB", ceid: "GB:en", language: "en", country: "Inggris" },
+    { match: /australia/, hl: "en-AU", gl: "AU", ceid: "AU:en", language: "en", country: "Australia" },
+  ];
+  const selected = profiles.find(profile => profile.match.test(hint));
+  const foreign = Boolean(selected || /media asing|foreign|international|english/.test(hint));
+  return selected || (foreign
+    ? { hl: "en-US", gl: "US", ceid: "US:en", language: "en", country: "Internasional" }
+    : { hl: "id", gl: "ID", ceid: "ID:id", language: "id", country: "Indonesia" });
+}
+
+function feedQuery(rule, profile) {
   const value = rule.value.replace(/^#|^@/, "").trim();
+  const window = profile.language === "id" ? "30d" : "365d";
   if (rule.type === "URL") {
     let host = value;
     try { host = new URL(value.includes("://") ? value : `https://${value}`).hostname; } catch { host = value; }
-    return `site:${host} (Badung OR Kuta OR Canggu) when:30d`;
+    return `site:${host} (Badung OR Kuta OR Canggu OR Seminyak OR "Nusa Dua") when:${window}`;
   }
-  if (rule.type === "Penulis") return `"${value}" (Badung OR Bali) when:30d`;
-  if (rule.type === "Keyword" || rule.type === "Hashtag") return `${value} when:30d`;
+  if (rule.type === "Penulis") return `"${value}" (Badung OR Bali) when:${window}`;
+  if (rule.type === "Keyword" || rule.type === "Hashtag") return `${value} when:${window}`;
   return null;
 }
 
 function classify(content) {
   const value = content.toLowerCase();
   const topics = [
-    ["Sampah & Kebersihan", /sampah|kebersihan|limbah|tpa|bersih/],
-    ["Kemacetan & Transportasi", /macet|kemacetan|lalu lintas|transportasi|angkutan|parkir/],
-    ["Banjir & Drainase", /banjir|drainase|genangan/],
-    ["Jalan & Infrastruktur", /jalan rusak|infrastruktur|jembatan|trotoar|penerangan/],
-    ["Layanan Publik", /pelayanan|layanan publik|ktp|dukcapil|pajak|perizinan|dpmptsp|bapenda/],
-    ["Pariwisata", /pariwisata|wisatawan|turis|hotel|pantai|destinasi/],
+    ["Sampah & Kebersihan", /sampah|kebersihan|limbah|tpa|bersih|waste|trash|rubbish|pollution|garbage/],
+    ["Kemacetan & Transportasi", /macet|kemacetan|lalu lintas|transportasi|angkutan|parkir|traffic|congestion|transport|fuel shortage/],
+    ["Banjir & Drainase", /banjir|drainase|genangan|flood|flooding|drainage/],
+    ["Jalan & Infrastruktur", /jalan rusak|infrastruktur|jembatan|trotoar|penerangan|infrastructure|\broads?\b|bridge|development/],
+    ["Layanan Publik", /pelayanan|layanan publik|ktp|dukcapil|pajak|perizinan|dpmptsp|bapenda|public service|authority|government service/],
+    ["Pariwisata", /pariwisata|wisatawan|turis|hotel|pantai|destinasi|tourism|tourist|travel|resort|beach|holiday/],
   ];
   const topic = topics.find(([, pattern]) => pattern.test(value))?.[0] || null;
-  const negative = /keluhan|dikeluhkan|masalah|buruk|rusak|macet|banjir|sampah|krisis|korupsi|protes|kecelakaan/.test(value);
-  const positive = /apresiasi|berhasil|baik|meningkat|penghargaan|diresmikan|membaik|prestasi/.test(value);
+  const negative = /keluhan|dikeluhkan|masalah|buruk|rusak|macet|banjir|sampah|krisis|korupsi|protes|kecelakaan|complaint|problem|severe|shortage|crime|killed|death|pollution|overcrowd/.test(value);
+  const positive = /apresiasi|berhasil|baik|meningkat|penghargaan|diresmikan|membaik|prestasi|improve|award|success|revive|distinctive/.test(value);
   const sentiment = negative && !positive ? "Negative" : positive && !negative ? "Positive" : null;
   const severity = /darurat|korban|bencana|krisis|fatal/.test(value) ? "Critical" : negative ? "High" : topic ? "Medium" : null;
-  const locations = ["Kuta Selatan", "Kuta Utara", "Abiansemal", "Mengwi", "Petang", "Kuta", "Canggu", "Badung"];
+  const locations = ["Kuta Selatan", "Kuta Utara", "Abiansemal", "Mengwi", "Petang", "Nusa Dua", "Tanjung Benoa", "Seminyak", "Uluwatu", "Jimbaran", "Legian", "Kerobokan", "Kuta", "Canggu", "Badung"];
   const location = locations.find(name => value.includes(name.toLowerCase())) || null;
   return { topic, sentiment, severity, location };
 }
 
+function isRelevantForeignContent(content) {
+  return /badung|kuta|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan|bali|バリ|クタ|チャングー|バドゥン/i.test(content);
+}
+
 function parseFeed(xml, rule) {
+  const profile = feedProfile(rule);
   const blocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
   return blocks.slice(0, 12).flatMap(block => {
     const title = text(tag(block, "title"));
@@ -68,17 +92,18 @@ function parseFeed(xml, rule) {
     const publisher = source(block) || title.split(" - ").at(-1) || "Google News";
     const cleanTitle = title.endsWith(` - ${publisher}`) ? title.slice(0, -(publisher.length + 3)) : title;
     const excerpt = text(tag(block, "description"));
+    if (profile.language !== "id" && !isRelevantForeignContent(`${cleanTitle} ${excerpt}`)) return [];
     const publishedAt = tag(block, "pubDate");
     const externalId = text(tag(block, "guid")) || url;
     const analysis = classify(`${cleanTitle} ${excerpt}`);
     return [{
       ruleId: rule.id, source: `Google News RSS · ${publisher}`, externalId, url, title: cleanTitle,
-      publisher, platform: "Media Online", language: "id", country: "Indonesia",
+      publisher, platform: profile.language === "id" ? "Media Online" : "Media Asing", language: profile.language, country: profile.country,
       location: analysis.location || undefined, publishedAt: publishedAt ? new Date(publishedAt).toISOString() : undefined,
       rawPayload: {
         adapter: "google-news-rss", queryRule: rule.code, topic: analysis.topic, sentiment: analysis.sentiment,
         severity: analysis.severity, sourceGroup: "Media Konvensional", evidenceType: "Media Publik",
-        sourceNote: "Konten ditemukan melalui Google News RSS. URL publikasi dan waktu capture disimpan sebagai evidence.",
+        sourceNote: `Konten ${profile.language === "id" ? "Indonesia" : `berbahasa ${profile.language.toUpperCase()}`} ditemukan melalui Google News RSS. URL publikasi dan waktu capture disimpan sebagai evidence.`,
         ai: analysis.topic || analysis.sentiment ? { summary: cleanTitle, recommendation: "Review isi dan sumber asli sebelum menentukan tindak lanjut.", confidence: 0.45, entities: analysis.location ? [analysis.location] : [] } : undefined,
       },
     }];
@@ -93,9 +118,10 @@ async function api(path, options = {}) {
 }
 
 async function crawlRule(rule) {
-  const query = feedQuery(rule);
+  const profile = feedProfile(rule);
+  const query = feedQuery(rule, profile);
   if (!query) return { rule, items: [], skipped: `Adapter ${rule.type} memerlukan API provider.` };
-  const feedUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=id&gl=ID&ceid=ID:id`;
+  const feedUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${profile.hl}&gl=${profile.gl}&ceid=${profile.ceid}`;
   const response = await fetch(feedUrl, { headers: { "User-Agent": "ClueFyCrawler/1.0 (+public-news-monitoring)" } });
   if (!response.ok) throw new Error(`${rule.code}: feed ${response.status}`);
   return { rule, items: parseFeed(await response.text(), rule) };
