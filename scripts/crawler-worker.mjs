@@ -15,11 +15,52 @@ function decodeXml(value = "") {
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
     .replace(/&#x([\da-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
-    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+    .replace(/&nbsp;/g, " ").replace(/&mdash;/g, "—").replace(/&ndash;/g, "–")
+    .replace(/&laquo;/g, "«").replace(/&raquo;/g, "»").replace(/&lsquo;/g, "‘").replace(/&rsquo;/g, "’")
+    .replace(/&ldquo;/g, "“").replace(/&rdquo;/g, "”").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'");
 }
 
 function text(value = "") {
   return decodeXml(value).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function directArticleUrl(rule) {
+  if (rule.type !== "URL" || !/direct article|artikel langsung/i.test(`${rule.source || ""} ${rule.note || ""}`)) return null;
+  try {
+    const url = new URL(rule.value.includes("://") ? rule.value : `https://${rule.value}`);
+    return url.pathname && url.pathname !== "/" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function jsonLdArticles(html) {
+  const values = [];
+  for (const match of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      const nodes = Array.isArray(parsed) ? parsed : parsed?.["@graph"] ? parsed["@graph"] : [parsed];
+      values.push(...nodes.filter(Boolean));
+    } catch { /* Publisher JSON-LD can contain non-JSON markup. */ }
+  }
+  return values.filter(value => /article/i.test(Array.isArray(value?.["@type"]) ? value["@type"].join(" ") : String(value?.["@type"] || "")));
+}
+
+function metaContent(html, key) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = [
+    new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']*)["'][^>]*>`, "i"),
+    new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${escaped}["'][^>]*>`, "i"),
+  ];
+  return text(patterns.map(pattern => html.match(pattern)?.[1]).find(Boolean) || "");
+}
+
+function publisherFromUrl(url, article) {
+  const hostname = new URL(url).hostname.replace(/^www\./, "");
+  const known = { "aif.ru": "Аргументы и Факты" };
+  const publisher = Array.isArray(article?.publisher) ? article.publisher[0] : article?.publisher;
+  return text(publisher?.name || publisher || known[hostname] || hostname);
 }
 
 function tag(block, name) {
@@ -79,8 +120,14 @@ function classify(content) {
   const positive = /apresiasi|berhasil|baik|meningkat|penghargaan|diresmikan|membaik|prestasi|improve|award|success|revive|distinctive/.test(value);
   const sentiment = negative && !positive ? "Negative" : positive && !negative ? "Positive" : null;
   const severity = /darurat|korban|bencana|krisis|fatal/.test(value) ? "Critical" : negative ? "High" : topic ? "Medium" : null;
-  const locations = ["Kuta Selatan", "Kuta Utara", "Abiansemal", "Mengwi", "Petang", "Nusa Dua", "Tanjung Benoa", "Seminyak", "Uluwatu", "Jimbaran", "Legian", "Kerobokan", "Kuta", "Canggu", "Badung"];
-  const location = locations.find(name => value.includes(name.toLowerCase())) || null;
+  const locations = [
+    ["Kuta Selatan", /kuta selatan|южн[^ ]* кут/], ["Kuta Utara", /kuta utara|северн[^ ]* кут/],
+    ["Abiansemal", /abiansemal/], ["Mengwi", /mengwi/], ["Petang", /\bpetang\b/], ["Nusa Dua", /nusa dua|нуса[ -]дуа/],
+    ["Tanjung Benoa", /tanjung benoa/], ["Seminyak", /seminyak|семиньяк/], ["Uluwatu", /uluwatu|улувату/],
+    ["Jimbaran", /jimbaran|джимбаран/], ["Legian", /legian|легиан/], ["Kerobokan", /kerobokan|керобокан/],
+    ["Kuta", /\bkuta\b|кута/], ["Canggu", /canggu|чангу/], ["Badung", /badung|бадунг|бадунзі/],
+  ];
+  const location = locations.find(([, pattern]) => pattern.test(value))?.[0] || null;
   return { topic, sentiment, severity, location };
 }
 
@@ -182,6 +229,75 @@ async function parseFeed(xml, rule, existingTranslations) {
   });
 }
 
+async function crawlDirectArticle(rule, existingTranslations) {
+  const url = directArticleUrl(rule);
+  if (!url) return null;
+  const profile = feedProfile(rule);
+  const response = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; ClueFyCrawler/1.0; +public-news-monitoring)" },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!response.ok) throw new Error(`${rule.code}: artikel ${response.status}`);
+  const html = await response.text();
+  const article = jsonLdArticles(html)[0] || {};
+  const title = text(article.headline || metaContent(html, "og:title") || html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "");
+  const description = text(article.description || metaContent(html, "og:description") || metaContent(html, "description"));
+  const body = text(article.articleBody || "");
+  const canonical = text(article.mainEntityOfPage?.["@id"] || metaContent(html, "og:url")) || url;
+  const authorValue = Array.isArray(article.author) ? article.author[0] : article.author;
+  const author = text(authorValue?.name || authorValue || metaContent(html, "author"));
+  const publisher = publisherFromUrl(canonical, article);
+  const publishedValue = article.datePublished || metaContent(html, "article:published_time");
+  const publishedDate = publishedValue ? new Date(publishedValue) : null;
+  if (!title) throw new Error(`${rule.code}: judul artikel tidak ditemukan`);
+  if (publishedDate && Number.isFinite(publishedDate.getTime()) && publishedDate < crawlSince) return { rule, items: [] };
+  if (profile.language !== "id" && !isRelevantForeignContent(`${title} ${description} ${body}`)) return { rule, items: [] };
+  const analysis = classify(`${title} ${description} ${body}`);
+  const externalId = canonical;
+  const existing = existingTranslations.get(externalId);
+  const generated = existing || (await translateBatchToIndonesian([title], profile.language))[0] || null;
+  return {
+    rule,
+    items: [{
+      ruleId: rule.id,
+      source: `Direct Article · ${publisher}`,
+      externalId,
+      url: canonical,
+      title,
+      excerpt: description || undefined,
+      body: body || undefined,
+      author: author || undefined,
+      publisher,
+      platform: profile.language === "id" ? "Media Online" : "Media Asing",
+      language: profile.language,
+      country: profile.country,
+      location: analysis.location || undefined,
+      publishedAt: publishedDate && Number.isFinite(publishedDate.getTime()) ? publishedDate.toISOString() : undefined,
+      translationNeedsSave: Boolean(generated && !existing),
+      rawPayload: {
+        adapter: "direct-article",
+        queryRule: rule.code,
+        topic: analysis.topic,
+        sentiment: analysis.sentiment,
+        severity: analysis.severity,
+        sourceGroup: "Media Konvensional",
+        evidenceType: "Media Publik",
+        sourceNote: "Artikel diambil langsung dari URL publisher. URL kanonik, byline, isi, dan waktu publikasi disimpan sebagai evidence.",
+        translation: generated,
+        translationProvider: generated ? "Automated translation demo" : undefined,
+        ai: {
+          summary: generated || title,
+          recommendation: analysis.severity === "Critical" || analysis.severity === "High"
+            ? "Verifikasi dampak operasional di Badung dan teruskan ke OPD terkait untuk tindak lanjut."
+            : "Review isi dan sumber asli sebelum menentukan tindak lanjut.",
+          confidence: body ? 0.88 : 0.72,
+          entities: analysis.location ? [analysis.location] : [],
+        },
+      },
+    }],
+  };
+}
+
 async function api(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } });
   const payload = response.status === 204 ? null : await response.json().catch(() => ({}));
@@ -190,6 +306,8 @@ async function api(path, options = {}) {
 }
 
 async function crawlRule(rule, existingTranslations) {
+  const direct = await crawlDirectArticle(rule, existingTranslations);
+  if (direct) return direct;
   const profile = feedProfile(rule);
   const query = feedQuery(rule, profile);
   if (!query) return { rule, items: [], skipped: `Adapter ${rule.type} memerlukan API provider.` };

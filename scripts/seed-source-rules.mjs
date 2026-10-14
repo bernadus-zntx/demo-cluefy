@@ -13,6 +13,7 @@ const rules=[
   ['Penulis','Kadek Mahendra','Penulis · Lintas Media','Denpasar, Bali · Indonesia','Pantau byline Kadek Mahendra sejak 1 Oktober 2026'],
   ['Keyword','Бали (Кута OR Чангу OR Бадунг)','Media Asing · Русский · Rusia','Rusia · Русский','Berita Rusia tentang Badung sejak 1 Oktober 2026'],
   ['URL','aif.ru','Media Asing · Русский · Rusia','Rusia · Русский','Pantau AIF sejak 1 Oktober 2026'],
+  ['URL','https://aif.ru/politics/world/toplivnyy-krizis-na-bali-pochemu-net-benzina-i-chto-delat-turistam','Direct Article · Русский · Rusia','Rusia · Русский','Artikel langsung AIF tentang krisis BBM Bali dan dampaknya di Badung'],
   ['URL','osnmedia.ru','Media Asing · Русский · Rusia','Rusia · Русский','Pantau OSN Media sejak 1 Oktober 2026'],
   ['Keyword','Балі (Кута OR Чангу OR Бадунг)','Media Asing · Українська · Ukraina','Ukraina · Українська','Berita Ukraina tentang Badung sejak 1 Oktober 2026'],
   ['URL','unn.ua','Media Asing · Українська · Ukraina','Ukraina · Українська','Pantau UNN sejak 1 Oktober 2026'],

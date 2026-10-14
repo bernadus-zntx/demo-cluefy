@@ -9,8 +9,8 @@ const format=(value:number)=>new Intl.NumberFormat('id-ID').format(value);
 function group(items:LiveItem[],select:(item:LiveItem)=>string|null){const counts=new Map<string,number>();items.forEach(item=>{const value=select(item);if(value)counts.set(value,(counts.get(value)||0)+1);});return Array.from(counts,([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);}
 function within(item:LiveItem,days:number,offset=0){const value=item.publishedAt||item.capturedAt;const age=Date.now()-new Date(value).getTime();return age>=offset*86400000&&age<(offset+days)*86400000;}
 const districtNames=['Kuta','Kuta Selatan','Kuta Utara','Mengwi','Abiansemal','Petang'];
-const countryFlags:Record<string,string>={Indonesia:'🇮🇩',Australia:'🇦🇺',Jepang:'🇯🇵',Japan:'🇯🇵','Hong Kong':'🇭🇰',Jerman:'🇩🇪',Germany:'🇩🇪',Inggris:'🇬🇧','United Kingdom':'🇬🇧','United States':'🇺🇸',India:'🇮🇳',China:'🇨🇳',Prancis:'🇫🇷',France:'🇫🇷'};
-const languageNames:Record<string,string>={id:'Bahasa Indonesia',en:'English',ja:'日本語 / Japanese',de:'Deutsch',fr:'Français',zh:'中文 / Mandarin',ko:'한국어 / Korean',ru:'Русский / Russian'};
+const countryFlags:Record<string,string>={Indonesia:'🇮🇩',Australia:'🇦🇺',Jepang:'🇯🇵',Japan:'🇯🇵','Hong Kong':'🇭🇰',Jerman:'🇩🇪',Germany:'🇩🇪',Inggris:'🇬🇧','United Kingdom':'🇬🇧','United States':'🇺🇸','Amerika Serikat':'🇺🇸',Rusia:'🇷🇺',Ukraina:'🇺🇦',Internasional:'🌐',India:'🇮🇳',China:'🇨🇳',Prancis:'🇫🇷',France:'🇫🇷'};
+const languageNames:Record<string,string>={id:'Bahasa Indonesia',en:'English',ja:'日本語 / Japanese',de:'Deutsch',fr:'Français',zh:'中文 / Mandarin',ko:'한국어 / Korean',ru:'Русский / Russian',uk:'Українська / Ukrainian'};
 function districtFor(item:LiveItem){const raw=`${item.location||''} ${item.village||''}`.toLowerCase();if(/petang/.test(raw))return'Petang';if(/abiansemal/.test(raw))return'Abiansemal';if(/mengwi/.test(raw))return'Mengwi';if(/kuta selatan|jimbaran|ungasan|pecatu|nusa dua|benoa/.test(raw))return'Kuta Selatan';if(/kuta utara|canggu|berawa|tibubeneng|kerobokan/.test(raw))return'Kuta Utara';if(/\bkuta\b|seminyak|legian|kedonganan/.test(raw))return'Kuta';return null;}
 function pct(value:number,total:number){return total?Math.round(value/total*1000)/10:0;}
 
