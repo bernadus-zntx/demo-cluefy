@@ -13,7 +13,17 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Deploy to Vercel
 
-Import this folder into Vercel. The default framework/build settings are sufficient. Provider credentials can be added as environment variables when live integrations are enabled.
+Pushes to `main` deploy the linked `cluefy-dashboard` project to Vercel through `.github/workflows/deploy-production.yml`.
+
+Configure these GitHub Actions secrets before the first production run:
+
+- `VERCEL_TOKEN`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
+- `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`)
+- `CRAWLER_API_KEY`
+
+The workflow verifies the production build, deploys both build-time and runtime variables, then checks the live intelligence API. It can also be started manually from **Actions → Deploy Production → Run workflow**.
 
 ## Included screens
 
