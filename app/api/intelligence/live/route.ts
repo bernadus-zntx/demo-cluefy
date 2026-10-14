@@ -74,10 +74,14 @@ function itemFromRow(row: CrawlRow) {
     engagement: typeof raw.engagement === "number" ? raw.engagement : null,
     ai: {
       summary: text(ai.summary),
+      finding: text(ai.finding),
       recommendation: text(ai.recommendation),
       emotion: text(ai.emotion),
       confidence: typeof ai.confidence === "number" ? ai.confidence : null,
       entities: Array.isArray(ai.entities) ? ai.entities.filter(value => typeof value === "string") : [],
+      provider: text(ai.provider),
+      model: text(ai.model),
+      enrichedAt: text(ai.enrichedAt),
     },
   };
 }

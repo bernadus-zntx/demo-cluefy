@@ -22,10 +22,11 @@ Configure these GitHub Actions secrets before the first production run:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
 - `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`)
 - `CRAWLER_API_KEY`
+- `OPENAI_API_KEY`
 
 The workflow verifies the production build, deploys both build-time and runtime variables, then checks the live intelligence API. It can also be started manually from **Actions → Deploy Production → Run workflow**.
 
-The production crawler runs once every 10 minutes through `.github/workflows/crawler-schedule.yml`. It uses the repository's `CRAWLER_API_KEY`, reads active rules from the ClueFy dashboard, and writes run history plus deduplicated results through the production API.
+The production crawler runs once every 10 minutes through `.github/workflows/crawler-schedule.yml`. It uses the repository's `CRAWLER_API_KEY`, reads active rules from the ClueFy dashboard, and writes run history plus deduplicated results through the production API. New, revised, and previously unenriched records are processed by OpenAI in bounded batches for structured summaries, findings, recommendations, classification, translation, and relevance analysis. Human classification history always takes precedence over later AI output.
 
 ## Included screens
 

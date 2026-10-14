@@ -1,5 +1,8 @@
 const baseUrl = (process.env.CLUEFY_API_BASE_URL || "http://localhost:3107").replace(/\/$/, "");
 const apiKey = process.env.CRAWLER_API_KEY;
+const openAiKey = process.env.OPENAI_API_KEY;
+const openAiModel = process.env.OPENAI_MODEL || "gpt-6-luna";
+const aiMaxItems = Math.max(0, Number(process.env.AI_ENRICH_MAX_ITEMS || 25));
 const runOnce = process.argv.includes("--once");
 const cycleMs = 10 * 60 * 1000;
 const crawlSince = new Date(process.env.CRAWLER_SINCE || "2026-10-01T00:00:00+08:00");
@@ -9,6 +12,61 @@ if (!apiKey) throw new Error("CRAWLER_API_KEY belum tersedia.");
 
 const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 const translationCache = new Map();
+
+const aiSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    relevant: { type: "boolean" }, relevanceReason: { type: "string" }, summary: { type: "string" },
+    finding: { type: "string" }, recommendation: { type: "string" },
+    topic: { type: "string", enum: ["Sampah & Kebersihan", "Kemacetan & Transportasi", "Banjir & Drainase", "Jalan & Infrastruktur", "Layanan Publik", "Pariwisata", "Keamanan & Ketertiban", "Kesehatan", "Pendidikan", "Ekonomi & UMKM", "Belum diklasifikasi"] },
+    sentiment: { type: "string", enum: ["Positive", "Neutral", "Negative"] },
+    emotion: { type: "string" }, severity: { type: "string", enum: ["Critical", "High", "Medium", "Low"] },
+    location: { type: "string" }, village: { type: "string" }, actor: { type: "string" },
+    entities: { type: "array", items: { type: "string" } }, confidence: { type: "number", minimum: 0, maximum: 1 },
+    translation: { type: "string" },
+  },
+  required: ["relevant", "relevanceReason", "summary", "finding", "recommendation", "topic", "sentiment", "emotion", "severity", "location", "village", "actor", "entities", "confidence", "translation"],
+};
+
+function responseOutputText(payload) {
+  if (typeof payload?.output_text === "string") return payload.output_text;
+  for (const output of payload?.output || []) {
+    for (const content of output?.content || []) {
+      if (content?.type === "output_text" && typeof content.text === "string") return content.text;
+    }
+  }
+  return "";
+}
+
+async function enrichWithOpenAI(item) {
+  if (!openAiKey) return null;
+  const sourceContent = [item.title, item.excerpt, item.body].filter(Boolean).join("\n\n").slice(0, 12000);
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(30000),
+    body: JSON.stringify({
+      model: openAiModel, store: false, reasoning: { effort: "none" },
+      input: [
+        { role: "system", content: "Anda adalah analis media ClueFy untuk Pemerintah Kabupaten Badung. Analisis hanya dari bukti yang diberikan. Tulis ringkasan, temuan, rekomendasi, dan alasan relevansi dalam Bahasa Indonesia yang singkat dan operasional. relevant hanya true bila konten berdampak atau berkaitan nyata dengan Badung, Kuta, Canggu, Seminyak, Nusa Dua, Jimbaran, Uluwatu, Legian, Kerobokan, atau layanan Pemkab Badung. Untuk data yang tidak tersedia gunakan string kosong; jangan mengarang nama orang, desa, atau lokasi." },
+        { role: "user", content: JSON.stringify({
+          title: item.title || "", content: sourceContent, publisher: item.publisher || "", author: item.author || "",
+          language: item.language || "", country: item.country || "", detectedLocation: item.location || "",
+          initialClassification: item.rawPayload ? { topic: item.rawPayload.topic || "", sentiment: item.rawPayload.sentiment || "", severity: item.rawPayload.severity || "" } : {},
+        }) },
+      ],
+      text: { format: { type: "json_schema", name: "cluefy_article_enrichment", strict: true, schema: aiSchema } },
+      max_output_tokens: 1200,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`OpenAI ${response.status}: ${payload?.error?.message || response.statusText}`);
+  const output = responseOutputText(payload);
+  if (!output) throw new Error("OpenAI tidak mengembalikan structured output.");
+  const parsed = JSON.parse(output);
+  return { ...parsed, confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)) };
+}
 
 function decodeXml(value = "") {
   return value
@@ -92,7 +150,7 @@ function feedProfile(rule) {
     : { hl: "id", gl: "ID", ceid: "ID:id", language: "id", country: "Indonesia" });
 }
 
-function feedQuery(rule, profile) {
+function feedQuery(rule) {
   const value = rule.value.replace(/^#|^@/, "").trim();
   const window = `after:${crawlSinceLabel}`;
   if (rule.type === "URL") {
@@ -309,7 +367,7 @@ async function crawlRule(rule, existingTranslations) {
   const direct = await crawlDirectArticle(rule, existingTranslations);
   if (direct) return direct;
   const profile = feedProfile(rule);
-  const query = feedQuery(rule, profile);
+  const query = feedQuery(rule);
   if (!query) return { rule, items: [], skipped: `Adapter ${rule.type} memerlukan API provider.` };
   const feedUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${profile.hl}&gl=${profile.gl}&ceid=${profile.ceid}`;
   const response = await fetch(feedUrl, { headers: { "User-Agent": "ClueFyCrawler/1.0 (+public-news-monitoring)" } });
@@ -325,8 +383,8 @@ async function cycle() {
   const rules = [...(rulePayload.rules || [])].sort((a, b) => localePriority(a) - localePriority(b) || a.code.localeCompare(b.code));
   const runPayload = await api("/api/crawler/runs", { method: "POST", body: JSON.stringify({ rulesRequested: rules.length, metadata: { worker: "cluefy-google-news", started: new Date().toISOString() } }) });
   const runId = runPayload.run.id;
-  let received = 0, inserted = 0, duplicate = 0, revised = 0;
-  const errors = [], skipped = [];
+  let received = 0, inserted = 0, duplicate = 0, revised = 0, aiEnriched = 0, aiBackfilled = 0;
+  const errors = [], skipped = [], aiErrors = [];
   try {
     for (const rule of rules) {
       try {
@@ -336,13 +394,23 @@ async function cycle() {
         received += result.items.length;
         if (!result.items.length) continue;
         const ingested = await api("/api/crawler/ingest", { method: "POST", body: JSON.stringify({ items: result.items }) });
-        const enrichments = (ingested.results || []).flatMap((stored, index) => {
+        const enrichments = [];
+        for (const [index, stored] of (ingested.results || []).entries()) {
           const crawled = result.items[index];
           const translation = crawled?.rawPayload?.translation;
-          return stored.item_id && crawled?.translationNeedsSave && translation
-            ? [{ id: stored.item_id, translation, provider: crawled.rawPayload.translationProvider }]
-            : [];
-        });
+          if (!stored.item_id) continue;
+          const enrichment = { id: stored.item_id, ...(crawled?.translationNeedsSave && translation ? { translation, provider: crawled.rawPayload.translationProvider } : {}) };
+          if (openAiKey && aiEnriched < aiMaxItems && ["inserted", "revised"].includes(stored.action)) {
+            try {
+              enrichment.ai = await enrichWithOpenAI(crawled);
+              enrichment.model = openAiModel;
+              aiEnriched++;
+            } catch (error) {
+              aiErrors.push(`${rule.code}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+          }
+          if (enrichment.translation || enrichment.ai) enrichments.push(enrichment);
+        }
         if (enrichments.length) {
           await api("/api/crawler/enrich", { method: "POST", body: JSON.stringify({ items: enrichments }) });
           for (const item of result.items) {
@@ -357,9 +425,24 @@ async function cycle() {
         }
       } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
     }
+    if (openAiKey && aiEnriched < aiMaxItems) {
+      const backlog = (livePayload.items || []).filter(item => item.ai?.provider !== "OpenAI").slice(0, aiMaxItems - aiEnriched);
+      const enrichments = [];
+      for (const item of backlog) {
+        try {
+          const ai = await enrichWithOpenAI({ ...item, rawPayload: { topic: item.topic, sentiment: item.sentiment, severity: item.severity } });
+          enrichments.push({ id: item.id, ai, model: openAiModel });
+          aiEnriched++;
+          aiBackfilled++;
+        } catch (error) {
+          aiErrors.push(`backfill ${item.id}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      if (enrichments.length) await api("/api/crawler/enrich", { method: "POST", body: JSON.stringify({ items: enrichments }) });
+    }
     const status = errors.length ? (received ? "partial" : "failed") : "completed";
     await api("/api/crawler/runs", { method: "PATCH", body: JSON.stringify({ id: runId, status, itemsReceived: received, itemsInserted: inserted, itemsDuplicate: duplicate, itemsRevised: revised, errorMessage: errors.join(" | ") || null }) });
-    console.log(JSON.stringify({ status, rules: rules.length, received, inserted, duplicate, revised, skipped, errors }, null, 2));
+    console.log(JSON.stringify({ status, rules: rules.length, received, inserted, duplicate, revised, aiEnriched, aiBackfilled, aiErrors, skipped, errors }, null, 2));
   } catch (error) {
     await api("/api/crawler/runs", { method: "PATCH", body: JSON.stringify({ id: runId, status: "failed", itemsReceived: received, itemsInserted: inserted, itemsDuplicate: duplicate, itemsRevised: revised, errorMessage: error instanceof Error ? error.message : String(error) }) }).catch(() => {});
     throw error;

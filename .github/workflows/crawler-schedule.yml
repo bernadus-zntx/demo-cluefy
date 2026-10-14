@@ -22,12 +22,19 @@ jobs:
     env:
       CLUEFY_API_BASE_URL: https://cluefy-dashboard.vercel.app
       CRAWLER_API_KEY: ${{ secrets.CRAWLER_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: gpt-6-luna
+      AI_ENRICH_MAX_ITEMS: "25"
       CRAWLER_DEBUG: "1"
     steps:
       - name: Check crawler secret
         run: |
           if [ -z "$CRAWLER_API_KEY" ]; then
             echo "::error::GitHub secret CRAWLER_API_KEY belum tersedia."
+            exit 1
+          fi
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::GitHub secret OPENAI_API_KEY belum tersedia di environment production."
             exit 1
           fi
 
@@ -41,4 +48,3 @@ jobs:
 
       - name: Run one crawler cycle
         run: node scripts/crawler-worker.mjs --once
-

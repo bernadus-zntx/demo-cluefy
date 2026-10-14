@@ -9,7 +9,7 @@ export type LiveItem = {
   village:string|null; actor:string|null; translation:string|null; sourceGroup:string|null; evidenceType:string|null; sourceNote:string|null;
   validationStatus:string; validatedBy:string|null; validatedAt:string|null; classificationHistory:unknown[];
   reach:number|null; engagement:number|null;
-  ai:{summary:string|null;recommendation:string|null;emotion:string|null;confidence:number|null;entities:string[]};
+  ai:{summary:string|null;finding:string|null;recommendation:string|null;emotion:string|null;confidence:number|null;entities:string[];provider:string|null;model:string|null;enrichedAt:string|null};
 };
 
 type LiveRule = {id:string;code:string;rule_type:string;value:string;source:string;scope:string;status:string;last_run_at:string|null;result_count:number;updated_at:string};
