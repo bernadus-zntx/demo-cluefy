@@ -6,6 +6,7 @@ import { useFindings } from './Findings';
 import { formatLiveTime, liveText, useLiveIntelligence, type LiveItem } from './LiveIntelligence';
 
 const format=(value:number)=>new Intl.NumberFormat('id-ID').format(value);
+const compact=(value:number)=>new Intl.NumberFormat('id-ID',{notation:'compact',maximumFractionDigits:1}).format(value);
 function group(items:LiveItem[],select:(item:LiveItem)=>string|null){const counts=new Map<string,number>();items.forEach(item=>{const value=select(item);if(value)counts.set(value,(counts.get(value)||0)+1);});return Array.from(counts,([name,count])=>({name,count})).sort((a,b)=>b.count-a.count);}
 function within(item:LiveItem,days:number,offset=0){const value=item.publishedAt||item.capturedAt;const age=Date.now()-new Date(value).getTime();return age>=offset*86400000&&age<(offset+days)*86400000;}
 const districtNames=['Kuta','Kuta Selatan','Kuta Utara','Mengwi','Abiansemal','Petang'];
@@ -56,4 +57,47 @@ export function LiveServicePerformance(){
   </>;
 }
 
-export function LiveLeaderImage(){const live=useLiveIntelligence();const mentions=useMemo(()=>live.items.filter(item=>/bupati|kepala daerah|wakil bupati|pemerintah kabupaten badung/i.test(`${item.title} ${liveText(item)}`)),[live.items]);const sentiments=group(mentions,item=>item.sentiment||'Belum dianalisis');return <><div className="section-intro"><h2>Citra Kepala Daerah Kabupaten Badung</h2><p>Hanya percakapan aktual yang menyebut kepala daerah atau Pemerintah Kabupaten Badung.</p></div><div className="kpis"><LiveKpi label="Total Percakapan" value={format(mentions.length)} note="Berdasarkan konten tersimpan"/><LiveKpi label="Positive" value={format(sentiments.find(item=>item.name==='Positive')?.count||0)} note="Klasifikasi crawler"/><LiveKpi label="Negative" value={format(sentiments.find(item=>item.name==='Negative')?.count||0)} note="Klasifikasi crawler"/><LiveKpi label="Belum Dianalisis" value={format(sentiments.find(item=>item.name==='Belum dianalisis')?.count||0)} note="Menunggu enrichment"/></div><section className="card live-recent"><div className="card-title"><div><h3>Percakapan Terkait</h3><p>Konten aktual</p></div></div>{mentions.map(item=><a key={item.id} href={item.url} target="_blank" rel="noreferrer"><b>{item.title}</b><span>{item.publisher||item.source}</span><small>{formatLiveTime(item.publishedAt||item.capturedAt)}</small></a>)}{!mentions.length&&<Empty text="Belum ada mention aktual yang cocok."/>}</section></>;}
+const leaderActors={
+  'Kepala Daerah Kabupaten Badung':/bupati badung|kepala daerah|adi arnawa|pemerintah kabupaten badung|pemkab badung|pemkabbadung/i,
+  'Wakil Kepala Daerah Kabupaten Badung':/wakil bupati badung|wakil kepala daerah|alit sucipta/i,
+  'Sekretaris Daerah Kabupaten Badung':/sekretaris daerah badung|sekda badung/i,
+};
+
+export function LiveLeaderImage(){
+  const live=useLiveIntelligence();
+  const [actor,setActor]=useState<keyof typeof leaderActors>('Kepala Daerah Kabupaten Badung');
+  const matcher=leaderActors[actor];
+  const matches=(item:LiveItem)=>matcher.test(`${item.title} ${liveText(item)} ${item.author||''} ${item.publisher||''} ${item.actor||''}`);
+  const current=live.items.filter(item=>within(item,28)&&matches(item));
+  const previous=live.items.filter(item=>within(item,28,28)&&matches(item));
+  const classified=current.filter(item=>['Positive','Neutral','Negative'].includes(item.sentiment||''));
+  const positive=classified.filter(item=>item.sentiment==='Positive').length;
+  const neutral=classified.filter(item=>item.sentiment==='Neutral').length;
+  const previousClassified=previous.filter(item=>['Positive','Neutral','Negative'].includes(item.sentiment||''));
+  const previousPositive=previousClassified.filter(item=>item.sentiment==='Positive').length;
+  const positiveRate=pct(positive,classified.length);
+  const previousPositiveRate=pct(previousPositive,previousClassified.length);
+  const imageScore=classified.length?Math.round(((positive+neutral*.5)/classified.length)*1000)/10:null;
+  const confidences=current.map(item=>item.ai.confidence).filter((value):value is number=>value!==null).map(value=>value<=1?value*100:value);
+  const trustScore=confidences.length?Math.round(confidences.reduce((sum,value)=>sum+value,0)/confidences.length*10)/10:null;
+  const reach=current.reduce((sum,item)=>sum+(item.reach||0),0);
+  const growth=previous.length?Math.round((current.length-previous.length)/previous.length*1000)/10:null;
+  const topics=group(current,item=>item.topic||null);
+  const positiveTopics=group(current.filter(item=>item.sentiment==='Positive'),item=>item.topic||null).slice(0,3);
+  const attentionTopics=group(current.filter(item=>item.sentiment==='Negative'||['High','Critical'].includes(item.severity||'')),item=>item.topic||null).slice(0,3);
+  const channels=group(current,item=>item.platform||item.sourceGroup||item.source||null).slice(0,4);
+  const drivers=topics.slice(0,5).map(topic=>{const subset=current.filter(item=>item.topic===topic.name);const pos=subset.filter(item=>item.sentiment==='Positive').length;const neg=subset.filter(item=>item.sentiment==='Negative').length;return{...topic,tone:neg>pos?'negative':'positive',score:Math.max(6,Math.round(topic.count/Math.max(1,current.length)*100))};});
+  const dayCounts=Array.from({length:28},(_,index)=>{const date=new Date();date.setHours(0,0,0,0);date.setDate(date.getDate()-(27-index));const next=new Date(date);next.setDate(next.getDate()+1);return current.filter(item=>{const at=new Date(item.publishedAt||item.capturedAt);return at>=date&&at<next;}).length;});
+  const initials=actor.startsWith('Wakil')?'WK':actor.startsWith('Sekretaris')?'SD':'KD';
+  const scoreLabel=imageScore===null?'Belum cukup data':imageScore>=70?'Baik':imageScore>=50?'Cukup':'Perlu perhatian';
+  const topPositive=positiveTopics[0]?.name;
+  const topAttention=attentionTopics[0]?.name;
+  return <>
+    <div className="actor-selector"><div><small>ACTOR INTELLIGENCE</small><b>Actor yang dianalisis</b></div><select value={actor} onChange={event=>setActor(event.target.value as keyof typeof leaderActors)}>{Object.keys(leaderActors).map(value=><option key={value}>{value}</option>)}</select><button type="button">＋ Tambah Actor</button><p>Sentimen dihitung terhadap actor sebagai target, bukan hanya karena actor disebut dalam konten.</p></div>
+    <div className="leader-hero"><div className="leader-portrait"><span>{initials}</span></div><div><small>PUBLIC FIGURE INTELLIGENCE</small><h2>Citra {actor}</h2><p>Ringkasan persepsi publik berdasarkan percakapan digital aktual selama 28 hari terakhir.</p></div><div className="leader-score"><b>{imageScore===null?'—':imageScore}</b><span>Indeks Citra</span><em>{scoreLabel}</em></div></div>
+    <div className="kpis"><div className="kpi"><small>Total Percakapan</small><strong>{format(current.length)}</strong><p className={growth===null?'':growth>=0?'up':'down'}>{growth===null?'Belum ada periode pembanding':`${growth>=0?'↗':'↘'} ${Math.abs(growth)}% dari periode lalu`}</p></div><div className="kpi"><small>Sentimen Positif</small><strong>{classified.length?`${positiveRate}%`:'—'}</strong><p className={positiveRate>=previousPositiveRate?'up':'down'}>{previousClassified.length?`${positiveRate>=previousPositiveRate?'↗':'↘'} ${Math.abs(Math.round((positiveRate-previousPositiveRate)*10)/10)} poin`:'Menunggu klasifikasi cukup'}</p></div><div className="kpi"><small>Indeks Kepercayaan</small><strong>{trustScore===null?'—':trustScore}</strong><p>{trustScore===null?'Confidence AI belum tersedia':'Rata-rata confidence klasifikasi AI'}</p></div><div className="kpi"><small>Potensi Jangkauan</small><strong>{reach?compact(reach):'—'}</strong><p>{reach?'Seluruh kanal publik':'Belum tersedia dari sumber publik'}</p></div></div>
+    <div className="grid-main"><section className="card wide"><CardTitle title="Tren Citra & Percakapan" note="Pergerakan volume percakapan selama 28 hari"/><div className="chart-summary"><b>{format(current.length)}</b>{growth!==null&&<span className={`change ${growth>=0?'up':'down'}`}>{growth>=0?'↗':'↘'} {Math.abs(growth)}%</span>}<span>percakapan</span></div><LiveTrendChart values={dayCounts}/></section><section className="card"><CardTitle title="Pendorong Citra" note="Topik yang paling memengaruhi persepsi"/><div className="image-drivers">{drivers.map(driver=><div key={driver.name}><span>{driver.name}</span><b className={driver.tone==='positive'?'up':'down'}>{driver.score}%</b><i><em className={driver.tone} style={{width:`${driver.score}%`}}/></i></div>)}</div>{!drivers.length&&<Empty text="Topik terkait actor belum terklasifikasi."/>}</section></div>
+    <div className="grid-three"><section className="card"><CardTitle title="Topik Positif" note="Percakapan dengan sentimen positif"/><div className="leader-topics">{positiveTopics.map((topic,index)=><p key={topic.name}><span>{String(index+1).padStart(2,'0')}</span><b>{topic.name}</b><em>{format(topic.count)}</em></p>)}</div>{!positiveTopics.length&&<Empty text="Belum ada topik positif terklasifikasi."/>}</section><section className="card"><CardTitle title="Isu Perlu Perhatian" note="Berpotensi menurunkan persepsi"/><div className="leader-topics warning">{attentionTopics.map(topic=><p key={topic.name}><span>!</span><b>{topic.name}</b><em>{format(topic.count)}</em></p>)}</div>{!attentionTopics.length&&<Empty text="Belum ada isu prioritas terklasifikasi."/>}</section><section className="card"><CardTitle title="Sumber Percakapan" note="Distribusi kanal utama"/><div className="channel-mix">{channels.map(channel=><p key={channel.name}><span>{channel.name}</span><b>{pct(channel.count,current.length)}%</b></p>)}</div>{!channels.length&&<Empty text="Sumber percakapan belum tersedia."/>}</section></div>
+    <div className="insight-note"><span>✦</span><div><b>ClueFy Insight</b><p>{current.length?`${format(current.length)} percakapan terkait ${actor.toLowerCase()} terpantau dalam 28 hari. ${topPositive?`${topPositive} menjadi pendorong positif utama.`:'Topik positif belum cukup terklasifikasi.'} ${topAttention?`${topAttention} menjadi isu yang perlu diperhatikan.`:'Belum ada isu prioritas yang terdeteksi.'}`:'Belum ada percakapan aktual yang cocok untuk actor ini. Insight akan muncul otomatis setelah sumber terkait masuk dan diklasifikasi.'}</p></div></div>
+  </>;
+}
