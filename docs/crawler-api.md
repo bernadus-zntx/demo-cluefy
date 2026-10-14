@@ -70,9 +70,9 @@ The endpoint accepts up to 100 items per request. URL tracking parameters are re
 - `duplicate`: the article already exists and only `last_seen_at` was updated.
 - `revised`: the URL existed but its content changed, so a revision was recorded.
 
-## Built-in public news worker
+## Built-in public news and social worker
 
-The repository includes a worker for public Google News RSS results. It supports URL/domain, keyword, hashtag, and author rules. Social account and group rules are skipped until an authorized provider API is connected.
+The repository includes a worker for public Google News RSS results. It supports URL/domain, keyword, hashtag, author, social-account, and public-group rules. Social results discovered through a public search index are labeled `Public Crawl` and stored as social evidence. This fallback does not impersonate a logged-in user and does not bypass platform access controls; availability depends on what each platform exposes to public indexing. A connected provider API remains the preferred source when complete feeds, engagement, or comments are required.
 
 Run one cycle:
 

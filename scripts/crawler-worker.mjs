@@ -150,17 +150,39 @@ function feedProfile(rule) {
     : { hl: "id", gl: "ID", ceid: "ID:id", language: "id", country: "Indonesia" });
 }
 
-function feedQuery(rule) {
+const socialPlatforms = [
+  { match: /instagram/i, platform: "Instagram", site: "instagram.com/p" },
+  { match: /tiktok/i, platform: "TikTok", site: "tiktok.com/@" },
+  { match: /facebook/i, platform: "Facebook", site: "facebook.com" },
+  { match: /youtube/i, platform: "YouTube", site: "youtube.com/watch" },
+  { match: /reddit/i, platform: "Reddit", site: "reddit.com/r" },
+  { match: /(?:^|\W)(?:x|twitter)(?:\W|$)/i, platform: "X", site: "x.com" },
+];
+
+function configuredSocialPlatforms(rule) {
+  const hint = `${rule.source || ""} ${rule.note || ""}`;
+  return socialPlatforms.filter(item => item.match.test(hint));
+}
+
+function feedQueries(rule) {
   const value = rule.value.replace(/^#|^@/, "").trim();
   const window = `after:${crawlSinceLabel}`;
+  const social = configuredSocialPlatforms(rule);
+  if (["Akun Social", "Group Social"].includes(rule.type) || (rule.type === "Hashtag" && social.length)) {
+    const platforms = social.length ? social : socialPlatforms.filter(item => item.platform === "Instagram");
+    return platforms.map(item => ({
+      query: `site:${item.site} "${value}" ${window}`,
+      social: item,
+    }));
+  }
   if (rule.type === "URL") {
     let host = value;
     try { host = new URL(value.includes("://") ? value : `https://${value}`).hostname; } catch { host = value; }
-    return `site:${host} (Badung OR Kuta OR Canggu OR Seminyak OR "Nusa Dua") ${window}`;
+    return [{ query: `site:${host} (Badung OR Kuta OR Canggu OR Seminyak OR "Nusa Dua") ${window}` }];
   }
-  if (rule.type === "Penulis") return `"${value}" (Badung OR Bali) ${window}`;
-  if (rule.type === "Keyword" || rule.type === "Hashtag") return `${value} ${window}`;
-  return null;
+  if (rule.type === "Penulis") return [{ query: `"${value}" (Badung OR Bali) ${window}` }];
+  if (rule.type === "Keyword" || rule.type === "Hashtag") return [{ query: `${value} ${window}` }];
+  return [];
 }
 
 function classify(content) {
@@ -237,15 +259,18 @@ async function translateBatchToIndonesian(values, language) {
   return results;
 }
 
-async function parseFeed(xml, rule, existingTranslations) {
+async function parseFeed(xml, rule, existingTranslations, social = null) {
   const profile = feedProfile(rule);
+  const isSocial = Boolean(social);
+  const configuredAccount = ["Akun Social", "Group Social"].includes(rule.type) ? `@${rule.value.replace(/^@/, "")}` : null;
   const blocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
   const candidates = blocks.slice(0, 12).flatMap(block => {
     const title = text(tag(block, "title"));
     const url = text(tag(block, "link"));
     if (!title || !url) return [];
-    const publisher = source(block) || title.split(" - ").at(-1) || "Google News";
-    const cleanTitle = title.endsWith(` - ${publisher}`) ? title.slice(0, -(publisher.length + 3)) : title;
+    const indexedPublisher = source(block) || title.split(" - ").at(-1) || "Google News";
+    const cleanTitle = title.endsWith(` - ${indexedPublisher}`) ? title.slice(0, -(indexedPublisher.length + 3)) : title;
+    const publisher = isSocial ? configuredAccount || `${social.platform} Public` : indexedPublisher;
     const excerpt = text(tag(block, "description"));
     if (profile.language !== "id" && !isRelevantForeignContent(`${cleanTitle} ${excerpt}`)) return [];
     const publishedAt = tag(block, "pubDate");
@@ -254,14 +279,18 @@ async function parseFeed(xml, rule, existingTranslations) {
     const externalId = text(tag(block, "guid")) || url;
     const analysis = classify(`${cleanTitle} ${excerpt}`);
     return [{
-      ruleId: rule.id, source: `Google News RSS · ${publisher}`, externalId, url, title: cleanTitle,
-      author: rule.type === "Penulis" ? rule.value : undefined,
-      publisher, platform: profile.language === "id" ? "Media Online" : "Media Asing", language: profile.language, country: profile.country,
+      ruleId: rule.id, source: isSocial ? `Public Crawl · ${social.platform}` : `Google News RSS · ${publisher}`, externalId, url, title: cleanTitle,
+      author: isSocial ? configuredAccount || undefined : rule.type === "Penulis" ? rule.value : undefined,
+      publisher, platform: isSocial ? social.platform : profile.language === "id" ? "Media Online" : "Media Asing", language: profile.language, country: profile.country,
       location: analysis.location || undefined, publishedAt: publishedAt ? new Date(publishedAt).toISOString() : undefined,
       rawPayload: {
-        adapter: "google-news-rss", queryRule: rule.code, topic: analysis.topic, sentiment: analysis.sentiment,
-        severity: analysis.severity, sourceGroup: "Media Konvensional", evidenceType: "Media Publik",
-        sourceNote: `Konten ${profile.language === "id" ? "Indonesia" : `berbahasa ${profile.language.toUpperCase()}`} ditemukan melalui Google News RSS. URL publikasi dan waktu capture disimpan sebagai evidence.`,
+        adapter: isSocial ? "public-social-index" : "google-news-rss", queryRule: rule.code, topic: analysis.topic, sentiment: analysis.sentiment,
+        severity: analysis.severity, sourceGroup: isSocial ? "Social Media" : "Media Konvensional", evidenceType: isSocial ? "Percakapan Publik" : "Media Publik",
+        discoveryMethod: isSocial ? "public-search-index" : "google-news-rss",
+        connectionType: isSocial ? "Public Crawl" : "RSS",
+        sourceNote: isSocial
+          ? `Posting publik ${social.platform} ditemukan melalui indeks publik tanpa login. Caption, URL indeks, akun target, dan waktu publikasi disimpan sebagai evidence; ketersediaannya mengikuti kebijakan platform.`
+          : `Konten ${profile.language === "id" ? "Indonesia" : `berbahasa ${profile.language.toUpperCase()}`} ditemukan melalui Google News RSS. URL publikasi dan waktu capture disimpan sebagai evidence.`,
         ai: analysis.topic || analysis.sentiment ? { summary: cleanTitle, recommendation: "Review isi dan sumber asli sebelum menentukan tindak lanjut.", confidence: 0.45, entities: analysis.location ? [analysis.location] : [] } : undefined,
       },
     }];
@@ -367,12 +396,17 @@ async function crawlRule(rule, existingTranslations) {
   const direct = await crawlDirectArticle(rule, existingTranslations);
   if (direct) return direct;
   const profile = feedProfile(rule);
-  const query = feedQuery(rule);
-  if (!query) return { rule, items: [], skipped: `Adapter ${rule.type} memerlukan API provider.` };
-  const feedUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=${profile.hl}&gl=${profile.gl}&ceid=${profile.ceid}`;
-  const response = await fetch(feedUrl, { headers: { "User-Agent": "ClueFyCrawler/1.0 (+public-news-monitoring)" } });
-  if (!response.ok) throw new Error(`${rule.code}: feed ${response.status}`);
-  return { rule, items: await parseFeed(await response.text(), rule, existingTranslations) };
+  const queries = feedQueries(rule);
+  if (!queries.length) return { rule, items: [], skipped: `Adapter ${rule.type} belum memiliki sumber publik.` };
+  const batches = [];
+  for (const entry of queries) {
+    const feedUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(entry.query)}&hl=${profile.hl}&gl=${profile.gl}&ceid=${profile.ceid}`;
+    const response = await fetch(feedUrl, { headers: { "User-Agent": "ClueFyCrawler/1.0 (+public-news-and-social-monitoring)" } });
+    if (!response.ok) throw new Error(`${rule.code}: feed ${response.status}`);
+    batches.push(...await parseFeed(await response.text(), rule, existingTranslations, entry.social));
+  }
+  const seen = new Set();
+  return { rule, items: batches.filter(item => !seen.has(item.externalId) && seen.add(item.externalId)).slice(0, 36) };
 }
 
 async function cycle() {
