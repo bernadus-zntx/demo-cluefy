@@ -178,6 +178,7 @@ function GovernmentDataSources(){
   const live=useLiveIntelligence();
   const liveItems=live.items;
   const isSocial=(value:string)=>/instagram|facebook|tiktok|youtube|reddit|twitter|\bx\b|social|telegram/.test(value.toLowerCase());
+  const isSocialItem=(item:LiveItem)=>isSocial(`${item.platform||''} ${item.source||''} ${item.sourceGroup||''}`);
   const initials=(value:string)=>value.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase()||'—';
   const countryFlag=(country:string)=>({Indonesia:'🇮🇩',Australia:'🇦🇺','Hong Kong':'🇭🇰',Jepang:'🇯🇵',Jerman:'🇩🇪',Inggris:'🇬🇧',Singapura:'🇸🇬',Prancis:'🇫🇷','Amerika Serikat':'🇺🇸',Rusia:'🇷🇺',Ukraina:'🇺🇦',Internasional:'🌐'} as Record<string,string>)[country]||'🌐';
   const rows=useMemo(()=>{
@@ -195,9 +196,9 @@ function GovernmentDataSources(){
       }).sort((a,b)=>b.volume-a.volume);
     };
     return {
-      social:group(item=>item.platform||item.source,item=>isSocial(`${item.platform||''} ${item.source}`)),
-      media:group(item=>item.publisher||item.source,item=>!isSocial(`${item.platform||''} ${item.source}`)),
-      authors:group(item=>item.author,item=>Boolean(item.author),true),
+      social:group(item=>item.author||item.publisher||item.source,item=>isSocialItem(item)),
+      media:group(item=>item.publisher||item.source,item=>!isSocialItem(item)),
+      authors:group(item=>item.author,item=>!isSocialItem(item)&&Boolean(item.author),true),
     };
   },[liveItems]);
   const activeRows=rows[sourceView];
@@ -212,16 +213,16 @@ function GovernmentDataSources(){
     </div>
     {section==="crawler"?<CrawlerConfiguration/>:<>
     <div className="real-data-notice"><span>{live.error?'!':'✓'}</span><div><b>{live.error?'Koneksi bermasalah':live.configured?'Direktori membaca Supabase':'Supabase belum terhubung'}</b><p>{live.error||`${liveItems.length.toLocaleString('id-ID')} konten tersimpan. Direktori tidak menampilkan sumber contoh.`}</p></div></div>
-    <div className="source-summary source-intel-summary"><span><b>{rows.social.length}</b> kanal social media</span><span><b>{rows.media.length}</b> media terpantau</span><span><b>{rows.authors.length}</b> penulis teridentifikasi</span><span><b>{countries}</b> negara asal</span></div>
+    <div className="source-summary source-intel-summary"><span><b>{rows.social.length}</b> akun social media</span><span><b>{rows.media.length}</b> media terpantau</span><span><b>{rows.authors.length}</b> penulis teridentifikasi</span><span><b>{countries}</b> negara asal</span></div>
     <div className="source-category-tabs" role="tablist" aria-label="Kategori sumber data">
       <button className={sourceView==="social"?"active":""} onClick={()=>setSourceView("social")} role="tab" aria-selected={sourceView==="social"}><i>◎</i><span><b>Social Media</b><small>Akun dan kanal percakapan publik</small></span><em>{rows.social.length}</em></button>
       <button className={sourceView==="media"?"active":""} onClick={()=>setSourceView("media")} role="tab" aria-selected={sourceView==="media"}><i>▤</i><span><b>Media</b><small>Portal berita dan publikasi</small></span><em>{rows.media.length}</em></button>
       <button className={sourceView==="authors"?"active":""} onClick={()=>setSourceView("authors")} role="tab" aria-selected={sourceView==="authors"}><i>✎</i><span><b>Penulis</b><small>Kontributor lintas media</small></span><em>{rows.authors.length}</em></button>
     </div>
     <section className="card source-directory">
-      <div className="source-directory-head"><div><h3>{sourceView==="social"?"Social Media":sourceView==="media"?"Media terpantau":"Direktori penulis"}</h3><p>{sourceView==="authors"?"Relasi penulis dan media dihitung dari artikel yang tersimpan.":"Negara dan asal ditampilkan jika tersedia pada metadata sumber."}</p></div><div className="source-search">⌕ <input value={sourceQuery} onChange={event=>setSourceQuery(event.target.value)} placeholder={`Cari ${sourceView==="authors"?"penulis":"sumber"}...`} aria-label="Cari sumber data"/></div></div>
+      <div className="source-directory-head"><div><h3>{sourceView==="social"?"Akun Social Media":sourceView==="media"?"Media terpantau":"Direktori penulis"}</h3><p>{sourceView==="authors"?"Hanya byline dari artikel media; akun social media dipisahkan ke direktorinya sendiri.":sourceView==="social"?"Akun dikelompokkan berdasarkan handle atau nama profil pada kanal sosial.":"Negara dan asal ditampilkan jika tersedia pada metadata sumber."}</p></div><div className="source-search">⌕ <input value={sourceQuery} onChange={event=>setSourceQuery(event.target.value)} placeholder={`Cari ${sourceView==="authors"?"penulis":sourceView==="social"?"akun":"sumber"}...`} aria-label="Cari sumber data"/></div></div>
       <div className={`source-list ${sourceView==="authors"?"authors":""}`}>
-        <div className="source-list-row source-list-head"><span>{sourceView==="authors"?"PENULIS":"SUMBER / AKUN"}</span><span>NEGARA</span><span>ASAL</span>{sourceView==="authors"&&<span>MEDIA</span>}<span>STATUS</span><span>{volumeLabel}</span>{sourceView!=="authors"&&<span>LAST SYNC</span>}</div>
+        <div className="source-list-row source-list-head"><span>{sourceView==="authors"?"PENULIS":sourceView==="social"?"AKUN SOCIAL MEDIA":"SUMBER / MEDIA"}</span><span>NEGARA</span><span>ASAL</span>{sourceView==="authors"&&<span>MEDIA</span>}<span>STATUS</span><span>{volumeLabel}</span>{sourceView!=="authors"&&<span>LAST SYNC</span>}</div>
         {filteredRows.map((item,index)=><div className="source-list-row source-list-item" key={`${item.name}-${index}`}>
           <span className="source-entity"><i className={`source-directory-avatar ${item.tone||""}`}>{item.initial}</i><span><b>{item.name}</b><small>{item.detail||'Metadata kanal belum tersedia'}</small></span></span>
           <span className="source-country"><i>{countryFlag(item.country)}</i><b>{item.country}</b></span>
