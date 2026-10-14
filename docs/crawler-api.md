@@ -80,6 +80,8 @@ Run one cycle:
 npm run crawler:once
 ```
 
+Production runs automatically every 10 minutes through `.github/workflows/crawler-schedule.yml`. The scheduled worker reads active rules from the production API, records its run in Supabase, and sends each result through the same deduplicating ingestion endpoint. It can also be started manually from **Actions → Scheduled Crawler → Run workflow**.
+
 Keep a local worker running every 10 minutes:
 
 ```bash

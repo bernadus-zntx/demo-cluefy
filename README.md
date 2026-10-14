@@ -25,6 +25,8 @@ Configure these GitHub Actions secrets before the first production run:
 
 The workflow verifies the production build, deploys both build-time and runtime variables, then checks the live intelligence API. It can also be started manually from **Actions → Deploy Production → Run workflow**.
 
+The production crawler runs once every 10 minutes through `.github/workflows/crawler-schedule.yml`. It uses the repository's `CRAWLER_API_KEY`, reads active rules from the ClueFy dashboard, and writes run history plus deduplicated results through the production API.
+
 ## Included screens
 
 - Overview
