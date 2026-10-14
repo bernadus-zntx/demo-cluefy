@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import { useCases } from './Cases';
 import { activeRevision, createFinding, transition, type AnalysisRevision, type Command, type CommunicationFormat, type Finding, type Sentiment, type Severity } from './model';
+import { liveText, useLiveIntelligence, type LiveItem } from './LiveIntelligence';
 import styles from './findings.module.css';
 
 export type FindingConversation = { source: string; name: string; text: string; topic: string; sentiment: Sentiment; translation?: string; sourceUrl?: string; publishedAt?: string; location?: string };
@@ -19,16 +20,93 @@ const Context = createContext<Store | null>(null);
 export function useFindings(){const value=useContext(Context);if(!value)throw new Error('Findings provider unavailable');return value;}
 function formatSegment(start:number,end:number){const value=(seconds:number)=>`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;return `${value(start)}–${value(end)}`;}
 
+const severityRank:Record<Severity,number>={Low:1,Medium:2,High:3,Critical:4};
+function stableCode(value:string){let hash=2166136261;for(let index=0;index<value.length;index+=1){hash^=value.charCodeAt(index);hash=Math.imul(hash,16777619);}return(hash>>>0).toString(16).toUpperCase().padStart(8,'0');}
+function usableDate(value:string|null|undefined){const date=value?new Date(value):null;return date&&!Number.isNaN(date.getTime())?date:null;}
+function normalizedSentiment(value:string|null):Sentiment{return value==='Positive'||value==='Negative'?value:'Neutral';}
+function normalizedSeverity(value:string|null):Severity|null{return value==='Low'||value==='Medium'||value==='High'||value==='Critical'?value:null;}
+function dominant(values:Array<string|null|undefined>,fallback:string){const counts=new Map<string,number>();values.forEach(raw=>{const value=raw?.trim();if(value)counts.set(value,(counts.get(value)||0)+1);});return Array.from(counts.entries()).sort((a,b)=>b[1]-a[1])[0]?.[0]||fallback;}
+function findingLocation(items:LiveItem[]){return dominant(items.map(item=>item.village||item.location),'Kabupaten Badung');}
+function findingFingerprint(finding:Finding){const revision=activeRevision(finding);return `${finding.id}|${finding.evidence.map(item=>item.id).join(',')}|${revision.title}|${revision.summary}|${revision.severity}|${revision.confidence}`;}
+function isUntouchedAiCandidate(finding:Finding){return finding.id.startsWith('FND-AI-')&&finding.auditEvents.every(event=>event.actor==='ClueFy AI');}
+function mergeLiveFindings(liveCandidates:Finding[],saved:Finding[]){
+  const savedById=new Map(saved.map(item=>[item.id,item]));
+  const merged=liveCandidates.map(candidate=>{const existing=savedById.get(candidate.id);if(!existing)return candidate;if(!isUntouchedAiCandidate(existing))return existing;return findingFingerprint(existing)===findingFingerprint(candidate)?existing:candidate;});
+  const liveIds=new Set(merged.map(item=>item.id));
+  return [...merged,...saved.filter(item=>!liveIds.has(item.id)&&!isUntouchedAiCandidate(item))];
+}
+
+function synthesizeLiveFindings(items:LiveItem[]):Finding[]{
+  const cutoff=Date.now()-28*86400000;
+  const grouped=new Map<string,LiveItem[]>();
+  items.forEach(item=>{
+    const topic=item.topic?.trim();
+    const at=usableDate(item.publishedAt||item.capturedAt);
+    if(!topic||/belum (diklasifikasi|dianalisis)/i.test(topic)||item.validationStatus?.toLowerCase()==='invalid'||!at||at.getTime()<cutoff)return;
+    const key=topic.toLocaleLowerCase('id-ID');
+    grouped.set(key,[...(grouped.get(key)||[]),item]);
+  });
+
+  return Array.from(grouped.values())
+    .filter(groupItems=>groupItems.length>=2)
+    .map(groupItems=>{
+      const sorted=[...groupItems].sort((a,b)=>(usableDate(b.publishedAt||b.capturedAt)?.getTime()||0)-(usableDate(a.publishedAt||a.capturedAt)?.getTime()||0));
+      const issue=sorted[0].topic!.trim();
+      const id=`FND-AI-${stableCode(issue.toLocaleLowerCase('id-ID'))}`;
+      const location=findingLocation(sorted);
+      const sentimentCounts={Positive:0,Neutral:0,Negative:0};
+      sorted.forEach(item=>{sentimentCounts[normalizedSentiment(item.sentiment)]+=1;});
+      const sentiment=(Object.entries(sentimentCounts) as Array<[Sentiment,number]>).sort((a,b)=>b[1]-a[1])[0][0];
+      const explicitSeverity=sorted.map(item=>normalizedSeverity(item.severity)).filter((value):value is Severity=>Boolean(value)).sort((a,b)=>severityRank[b]-severityRank[a])[0];
+      const negativeCount=sentimentCounts.Negative;
+      const severity=explicitSeverity||(negativeCount>=3||sorted.length>=8?'High':negativeCount>=1||sorted.length>=4?'Medium':'Low');
+      const sourceCount=new Set(sorted.map(item=>item.publisher||item.source)).size;
+      const title=`Pola berulang ${issue} di ${location}`;
+      const summaries=Array.from(new Set(sorted.map(item=>item.ai.summary?.trim()).filter((value):value is string=>Boolean(value))));
+      const findings=Array.from(new Set(sorted.map(item=>item.ai.finding?.trim()).filter((value):value is string=>Boolean(value))));
+      const recommendations=Array.from(new Set(sorted.map(item=>item.ai.recommendation?.trim()).filter((value):value is string=>Boolean(value))));
+      const summary=summaries[0]||`ClueFy AI menemukan ${sorted.length} aspirasi terkait ${issue.toLowerCase()} dari ${sourceCount} sumber. ${negativeCount} di antaranya bersentimen negatif dan pola paling sering terdeteksi di ${location}.`;
+      const analysis=findings.slice(0,2).join(' ')||`${sorted.length} aspirasi menunjukkan pola isu yang sama secara berulang. Keragaman ${sourceCount} sumber memperkuat sinyal, sementara lokasi dan konteks setiap evidence tetap perlu diperiksa oleh analyst.`;
+      const recommendation=recommendations[0]||`Review seluruh evidence, konfirmasi kondisi di ${location}, lalu tentukan PIC/OPD dan eskalasi menjadi Case bila membutuhkan SLA serta pelacakan tindakan.`;
+      const entities=Array.from(new Set(sorted.flatMap(item=>[...(item.ai.entities||[]),item.actor].filter((value):value is string=>Boolean(value?.trim()))))).slice(0,8);
+      if(!entities.length)entities.push('Pemkab Badung');
+      const confidenceValues=sorted.map(item=>item.ai.confidence).filter((value):value is number=>typeof value==='number').map(value=>value<=1?value*100:value);
+      const confidence=Math.round(confidenceValues.length?confidenceValues.reduce((sum,value)=>sum+value,0)/confidenceValues.length:Math.min(94,72+Math.log2(sorted.length)*5));
+      const createdAt=usableDate(sorted[sorted.length-1].publishedAt||sorted[sorted.length-1].capturedAt)?.toISOString()||new Date().toISOString();
+      const evidence=sorted.map((item,index)=>({
+        id:`${id}-EVD-${String(index+1).padStart(3,'0')}`,
+        source:item.publisher||item.source,
+        author:item.author||item.publisher||item.source,
+        sourceUrl:item.url||item.canonicalUrl,
+        publishedAt:item.publishedAt||undefined,
+        capturedAt:item.capturedAt,
+        mediaType:(item.evidenceType==='video'||/youtube|tiktok|video/i.test(`${item.platform} ${item.source}`)?'video':item.evidenceType==='audio'||/audio|radio|podcast/i.test(`${item.platform} ${item.source}`)?'audio':'text') as 'text'|'video'|'audio',
+        transcript:liveText(item),
+        translation:item.translation||undefined,
+      }));
+      const revision:AnalysisRevision={id:`${id}-REV-001`,number:1,title,analysis,summary,recommendation,issue,location,entities,sentiment,emotion:sentiment==='Negative'?'Concern':'Public interest',severity,confidence,reason:`AI synthesis otomatis dari ${evidence.length} aspirasi live; menunggu review manusia.`,createdBy:'ClueFy AI',createdAt,evidenceIds:evidence.map(item=>item.id)};
+      const after={status:'Draft' as const,validationStatus:'Draft' as const,disposition:'Undecided' as const,activeRevisionId:revision.id,title,issue,entities,sentiment,severity,watchlisted:false};
+      return {id,workspaceId:'government' as const,title,issue,entities,sentiment,severity,location,status:'Draft' as const,validationStatus:'Draft' as const,disposition:'Undecided' as const,watchlisted:false,relatedCaseIds:[],activeRevisionId:revision.id,evidence,revisions:[revision],reviewDecisions:[],distributions:[],communicationDrafts:[],auditEvents:[{id:`${id}-AUD-001`,actor:'ClueFy AI',action:'created' as const,createdAt,note:revision.reason,before:null,after}]};
+    })
+    .sort((a,b)=>severityRank[b.severity]-severityRank[a.severity]||b.evidence.length-a.evidence.length)
+    .slice(0,12);
+}
+
 export function FindingsProvider({children}:{children:ReactNode}){
-  const [findings,setFindings]=useState<Finding[]>([]); const [selected,setSelected]=useState<string|null>(null); const dialog=useRef<HTMLDialogElement>(null); const previousFocus=useRef<HTMLElement|null>(null);
+  const live=useLiveIntelligence();
+  const liveCandidates=useMemo(()=>synthesizeLiveFindings(live.items),[live.items]);
+  const [savedFindings,setSavedFindings]=useState<Finding[]>([]);
+  const findings=useMemo(()=>mergeLiveFindings(liveCandidates,savedFindings),[liveCandidates,savedFindings]);
+  const updateFindings=(update:(current:Finding[])=>Finding[])=>setSavedFindings(current=>update(mergeLiveFindings(liveCandidates,current)));
+  const [selected,setSelected]=useState<string|null>(null); const dialog=useRef<HTMLDialogElement>(null); const previousFocus=useRef<HTMLElement|null>(null);
   function inspect(id:string){previousFocus.current=document.activeElement as HTMLElement;setSelected(id);dialog.current?.showModal();}
   function close(){dialog.current?.close();setSelected(null);previousFocus.current?.focus();}
   const evidenceInput=(conversation:FindingConversation)=>({source:conversation.source,author:conversation.name,text:conversation.text,translation:conversation.translation,sourceUrl:conversation.sourceUrl,publishedAt:conversation.publishedAt});
-  function open(conversation:FindingConversation){const existing=findings.find(f=>f.evidence.some(evidence=>evidence.transcript===conversation.text&&evidence.author===conversation.name));if(existing)return inspect(existing.id);const id=`FND-${crypto.randomUUID().slice(0,8).toUpperCase()}`;const finding=createFinding(id,evidenceInput(conversation),conversation.topic,conversation.sentiment,new Date().toISOString());setFindings(items=>[finding,...items]);inspect(id);}
-  function addEvidence(findingId:string,conversations:FindingConversation[]){setFindings(items=>items.map(item=>{if(item.id!==findingId)return item;return conversations.reduce((current,conversation)=>current.evidence.some(evidence=>evidence.author===conversation.name&&evidence.transcript===conversation.text)?current:transition(current,{type:'attach',evidence:evidenceInput(conversation),reason:`Aspirasi ${conversation.name} ditambahkan sebagai supporting evidence.`},new Date().toISOString()),item);}));}
-  function createFromConversations(conversations:FindingConversation[],title:string){if(conversations.length<2)throw new Error('Pilih minimal dua aspirasi untuk membuat Finding baru.');const id=`FND-${crypto.randomUUID().slice(0,8).toUpperCase()}`;const first=conversations[0];let finding=createFinding(id,evidenceInput(first),first.topic,first.sentiment,new Date().toISOString());finding={...finding,title:title.trim()||finding.title,revisions:finding.revisions.map((revision,index)=>index===0?{...revision,title:title.trim()||revision.title}:revision)};for(const conversation of conversations.slice(1)){finding=transition(finding,{type:'attach',evidence:evidenceInput(conversation),reason:`Aspirasi ${conversation.name} ditambahkan saat Finding dibuat.`},new Date().toISOString());}setFindings(items=>[finding,...items]);return id;}
+  function open(conversation:FindingConversation){const existing=findings.find(f=>f.evidence.some(evidence=>evidence.transcript===conversation.text&&evidence.author===conversation.name));if(existing)return inspect(existing.id);const id=`FND-${crypto.randomUUID().slice(0,8).toUpperCase()}`;const finding=createFinding(id,evidenceInput(conversation),conversation.topic,conversation.sentiment,new Date().toISOString());updateFindings(items=>[finding,...items]);inspect(id);}
+  function addEvidence(findingId:string,conversations:FindingConversation[]){updateFindings(items=>items.map(item=>{if(item.id!==findingId)return item;return conversations.reduce((current,conversation)=>current.evidence.some(evidence=>evidence.author===conversation.name&&evidence.transcript===conversation.text)?current:transition(current,{type:'attach',evidence:evidenceInput(conversation),reason:`Aspirasi ${conversation.name} ditambahkan sebagai supporting evidence.`},new Date().toISOString()),item);}));}
+  function createFromConversations(conversations:FindingConversation[],title:string){if(conversations.length<2)throw new Error('Pilih minimal dua aspirasi untuk membuat Finding baru.');const id=`FND-${crypto.randomUUID().slice(0,8).toUpperCase()}`;const first=conversations[0];let finding=createFinding(id,evidenceInput(first),first.topic,first.sentiment,new Date().toISOString());finding={...finding,title:title.trim()||finding.title,revisions:finding.revisions.map((revision,index)=>index===0?{...revision,title:title.trim()||revision.title}:revision)};for(const conversation of conversations.slice(1)){finding=transition(finding,{type:'attach',evidence:evidenceInput(conversation),reason:`Aspirasi ${conversation.name} ditambahkan saat Finding dibuat.`},new Date().toISOString());}updateFindings(items=>[finding,...items]);return id;}
   const finding=findings.find(item=>item.id===selected);
-  return <Context.Provider value={{findings,open,inspect,addEvidence,createFromConversations}}>{children}<dialog className={styles.dialog} ref={dialog} aria-labelledby="finding-title" onCancel={close}>{finding&&<Review key={finding.id} finding={finding} close={close} update={command=>setFindings(items=>items.map(item=>item.id===finding.id?transition(item,command,new Date().toISOString()):item))}/>}</dialog></Context.Provider>;
+  return <Context.Provider value={{findings,open,inspect,addEvidence,createFromConversations}}>{children}<dialog className={styles.dialog} ref={dialog} aria-labelledby="finding-title" onCancel={close}>{finding&&<Review key={finding.id} finding={finding} close={close} update={command=>updateFindings(items=>items.map(item=>item.id===finding.id?transition(item,command,new Date().toISOString()):item))}/>}</dialog></Context.Provider>;
 }
 
 export function ConversationActions({conversation}:{conversation:FindingConversation}){

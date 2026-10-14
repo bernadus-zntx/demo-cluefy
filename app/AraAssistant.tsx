@@ -160,15 +160,6 @@ export function AraAssistant({ activePage }: { activePage: string }) {
 
   return (
     <div className={`${styles.root} ${open ? styles.open : ""}`}>
-      {!open && (
-        <div className={styles.hoverCard} role="status">
-          <span className={styles.hoverEyebrow}>ARA · AI ASSISTANT</span>
-          <strong>Tanya ARA tentang halaman ini</strong>
-          <p>{context.intro}</p>
-          <small>Klik untuk mulai percakapan</small>
-        </div>
-      )}
-
       {open && (
         <section className={styles.panel} aria-label="Percakapan dengan ARA">
           <header className={styles.panelHeader}>
@@ -233,7 +224,7 @@ export function AraAssistant({ activePage }: { activePage: string }) {
       >
         <span className={styles.launcherGlow} />
         <span className={styles.launcherIcon}>✦</span>
-        <span className={styles.launcherText}><b>ARA</b><small>Ask AI</small></span>
+        <span className={styles.launcherText}><b>ARA</b><small>Tanya AI</small></span>
         <i className={styles.onlineDot} />
       </button>
     </div>
