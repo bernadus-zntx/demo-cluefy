@@ -14,6 +14,7 @@
     "test:crawler": "node scripts/smoke-crawler.mjs",
     "crawler:once": "node --env-file=.env.local scripts/crawler-worker.mjs --once",
     "crawler:watch": "node --env-file=.env.local scripts/crawler-worker.mjs",
+    "crawler:seed": "node --env-file=.env.local scripts/seed-source-rules.mjs",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

@@ -2,6 +2,8 @@ const baseUrl = (process.env.CLUEFY_API_BASE_URL || "http://localhost:3107").rep
 const apiKey = process.env.CRAWLER_API_KEY;
 const runOnce = process.argv.includes("--once");
 const cycleMs = 10 * 60 * 1000;
+const crawlSince = new Date(process.env.CRAWLER_SINCE || "2026-10-01T00:00:00+08:00");
+const crawlSinceLabel = crawlSince.toISOString().slice(0, 10);
 
 if (!apiKey) throw new Error("CRAWLER_API_KEY belum tersedia.");
 
@@ -31,6 +33,9 @@ function source(block) {
 function feedProfile(rule) {
   const hint = `${rule.source || ""} ${rule.scope || ""} ${rule.note || ""}`.toLowerCase();
   const profiles = [
+    { match: /rusia|russia|russian|russki|рус|русский/, hl: "ru", gl: "RU", ceid: "RU:ru", language: "ru", country: "Rusia" },
+    { match: /ukraina|ukraine|ukrainian|україн|украин/, hl: "uk", gl: "UA", ceid: "UA:uk", language: "uk", country: "Ukraina" },
+    { match: /amerika serikat|united states|\busa\b|american/, hl: "en-US", gl: "US", ceid: "US:en", language: "en", country: "Amerika Serikat" },
     { match: /jepang|japan|japanese|日本|日本語/, hl: "ja", gl: "JP", ceid: "JP:ja", language: "ja", country: "Jepang" },
     { match: /prancis|france|french|français/, hl: "fr", gl: "FR", ceid: "FR:fr", language: "fr", country: "Prancis" },
     { match: /jerman|germany|german|deutsch/, hl: "de", gl: "DE", ceid: "DE:de", language: "de", country: "Jerman" },
@@ -48,29 +53,29 @@ function feedProfile(rule) {
 
 function feedQuery(rule, profile) {
   const value = rule.value.replace(/^#|^@/, "").trim();
-  const window = profile.language === "id" ? "30d" : "365d";
+  const window = `after:${crawlSinceLabel}`;
   if (rule.type === "URL") {
     let host = value;
     try { host = new URL(value.includes("://") ? value : `https://${value}`).hostname; } catch { host = value; }
-    return `site:${host} (Badung OR Kuta OR Canggu OR Seminyak OR "Nusa Dua") when:${window}`;
+    return `site:${host} (Badung OR Kuta OR Canggu OR Seminyak OR "Nusa Dua") ${window}`;
   }
-  if (rule.type === "Penulis") return `"${value}" (Badung OR Bali) when:${window}`;
-  if (rule.type === "Keyword" || rule.type === "Hashtag") return `${value} when:${window}`;
+  if (rule.type === "Penulis") return `"${value}" (Badung OR Bali) ${window}`;
+  if (rule.type === "Keyword" || rule.type === "Hashtag") return `${value} ${window}`;
   return null;
 }
 
 function classify(content) {
   const value = content.toLowerCase();
   const topics = [
-    ["Sampah & Kebersihan", /sampah|kebersihan|limbah|tpa|bersih|waste|trash|rubbish|pollution|garbage/],
-    ["Kemacetan & Transportasi", /macet|kemacetan|lalu lintas|transportasi|angkutan|parkir|traffic|congestion|transport|fuel shortage/],
-    ["Banjir & Drainase", /banjir|drainase|genangan|flood|flooding|drainage/],
+    ["Sampah & Kebersihan", /sampah|kebersihan|limbah|tpa|bersih|waste|trash|rubbish|pollution|garbage|мусор|отход|сміття|відход/],
+    ["Kemacetan & Transportasi", /macet|kemacetan|lalu lintas|transportasi|angkutan|parkir|traffic|congestion|transport|fuel shortage|пробк|затор|транспорт|топлив|пальн/],
+    ["Banjir & Drainase", /banjir|drainase|genangan|flood|flooding|drainage|наводнен|повінь/],
     ["Jalan & Infrastruktur", /jalan rusak|infrastruktur|jembatan|trotoar|penerangan|infrastructure|\broads?\b|bridge|development/],
     ["Layanan Publik", /pelayanan|layanan publik|ktp|dukcapil|pajak|perizinan|dpmptsp|bapenda|public service|authority|government service/],
-    ["Pariwisata", /pariwisata|wisatawan|turis|hotel|pantai|destinasi|tourism|tourist|travel|resort|beach|holiday/],
+    ["Pariwisata", /pariwisata|wisatawan|turis|hotel|pantai|destinasi|tourism|tourist|travel|resort|beach|holiday|туризм|турист|пляж/],
   ];
   const topic = topics.find(([, pattern]) => pattern.test(value))?.[0] || null;
-  const negative = /keluhan|dikeluhkan|masalah|buruk|rusak|macet|banjir|sampah|krisis|korupsi|protes|kecelakaan|complaint|problem|severe|shortage|crime|killed|death|pollution|overcrowd/.test(value);
+  const negative = /keluhan|dikeluhkan|masalah|buruk|rusak|macet|banjir|sampah|krisis|korupsi|protes|kecelakaan|complaint|problem|severe|shortage|crime|killed|death|pollution|overcrowd|кризис|криза|проблем|дефицит|дефіцит|авар|пожар|пожеж/.test(value);
   const positive = /apresiasi|berhasil|baik|meningkat|penghargaan|diresmikan|membaik|prestasi|improve|award|success|revive|distinctive/.test(value);
   const sentiment = negative && !positive ? "Negative" : positive && !negative ? "Positive" : null;
   const severity = /darurat|korban|bencana|krisis|fatal/.test(value) ? "Critical" : negative ? "High" : topic ? "Medium" : null;
@@ -80,7 +85,7 @@ function classify(content) {
 }
 
 function isRelevantForeignContent(content) {
-  return /badung|kuta|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan|bali|バリ|クタ|チャングー|バドゥン/i.test(content);
+  return /badung|kuta|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan|bali|バリ|クタ|チャングー|バドゥン|бали|балі|кута|чангу|бадунг|семиньяк|нуса-дуа/i.test(content);
 }
 
 async function translateFallback(value, language) {
@@ -139,10 +144,13 @@ async function parseFeed(xml, rule, existingTranslations) {
     const excerpt = text(tag(block, "description"));
     if (profile.language !== "id" && !isRelevantForeignContent(`${cleanTitle} ${excerpt}`)) return [];
     const publishedAt = tag(block, "pubDate");
+    const publishedDate = publishedAt ? new Date(publishedAt) : null;
+    if (publishedDate && Number.isFinite(publishedDate.getTime()) && publishedDate < crawlSince) return [];
     const externalId = text(tag(block, "guid")) || url;
     const analysis = classify(`${cleanTitle} ${excerpt}`);
     return [{
       ruleId: rule.id, source: `Google News RSS · ${publisher}`, externalId, url, title: cleanTitle,
+      author: rule.type === "Penulis" ? rule.value : undefined,
       publisher, platform: profile.language === "id" ? "Media Online" : "Media Asing", language: profile.language, country: profile.country,
       location: analysis.location || undefined, publishedAt: publishedAt ? new Date(publishedAt).toISOString() : undefined,
       rawPayload: {
@@ -195,7 +203,8 @@ async function cycle() {
   const livePayload = await api("/api/intelligence/live").catch(() => ({ items: [] }));
   const existingTranslations = new Map((livePayload.items || []).flatMap(item => item.externalId && item.translation ? [[item.externalId, item.translation]] : []));
   const rulePayload = await api("/api/crawler/rules", { headers: { Authorization: `Bearer ${apiKey}` } });
-  const rules = rulePayload.rules || [];
+  const localePriority = rule => ({ Internasional: 0, Indonesia: 1, "Amerika Serikat": 3, Rusia: 4, Ukraina: 5 }[feedProfile(rule).country] ?? 2);
+  const rules = [...(rulePayload.rules || [])].sort((a, b) => localePriority(a) - localePriority(b) || a.code.localeCompare(b.code));
   const runPayload = await api("/api/crawler/runs", { method: "POST", body: JSON.stringify({ rulesRequested: rules.length, metadata: { worker: "cluefy-google-news", started: new Date().toISOString() } }) });
   const runId = runPayload.run.id;
   let received = 0, inserted = 0, duplicate = 0, revised = 0;
@@ -204,6 +213,7 @@ async function cycle() {
     for (const rule of rules) {
       try {
         const result = await crawlRule(rule, existingTranslations);
+        if (process.env.CRAWLER_DEBUG === "1") console.log(`${rule.code} · ${feedProfile(rule).country} · ${result.items.length} item`);
         if (result.skipped) { skipped.push(`${rule.code}: ${result.skipped}`); continue; }
         received += result.items.length;
         if (!result.items.length) continue;

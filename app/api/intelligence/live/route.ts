@@ -32,7 +32,7 @@ function text(value: unknown) {
 function isRelevantItem(row: CrawlRow) {
   if (row.platform !== "Media Asing") return true;
   const content = `${row.title} ${row.excerpt ?? ""} ${row.body ?? ""}`;
-  return /badung|kuta|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan|bali|バリ|クタ|チャングー|バドゥン/i.test(content);
+  return /badung|kuta|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan|bali|バリ|クタ|チャングー|バドゥン|бали|балі|кута|чангу|бадунг|семиньяк|нуса-дуа/i.test(content);
 }
 
 function itemFromRow(row: CrawlRow) {

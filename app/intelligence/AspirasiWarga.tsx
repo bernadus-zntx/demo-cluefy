@@ -53,11 +53,21 @@ function sourceBadgeTone(record:Record):SourceBadgeTone{
   return record.platform==='Media Asing'?'foreign':'local';
 }
 
-function languageLabel(code:string){return ({id:'Bahasa Indonesia',en:'English',ja:'日本語',fr:'Français',de:'Deutsch'} as {[key:string]:string})[code.toLowerCase()]||code;}
+function languageLabel(code:string){return ({id:'Bahasa Indonesia',en:'English',ja:'日本語',fr:'Français',de:'Deutsch',ru:'Русский',uk:'Українська'} as {[key:string]:string})[code.toLowerCase()]||code;}
 
 function languageCountry(record:Record){return `${languageLabel(record.language)} · ${record.country}`;}
 
-function countryFlag(country:string){return ({Indonesia:'🇮🇩',Australia:'🇦🇺','Hong Kong':'🇭🇰',Jepang:'🇯🇵',Jerman:'🇩🇪',Inggris:'🇬🇧',Singapura:'🇸🇬',Prancis:'🇫🇷','Amerika Serikat':'🇺🇸',Kanada:'🇨🇦','Selandia Baru':'🇳🇿',Belanda:'🇳🇱',China:'🇨🇳',Malaysia:'🇲🇾',Internasional:'🌐'} as {[key:string]:string})[country]||'🌐';}
+function countryFlag(country:string){return ({Indonesia:'🇮🇩',Australia:'🇦🇺','Hong Kong':'🇭🇰',Jepang:'🇯🇵',Jerman:'🇩🇪',Inggris:'🇬🇧',Singapura:'🇸🇬',Prancis:'🇫🇷','Amerika Serikat':'🇺🇸',Rusia:'🇷🇺',Ukraina:'🇺🇦',Kanada:'🇨🇦','Selandia Baru':'🇳🇿',Belanda:'🇳🇱',China:'🇨🇳',Malaysia:'🇲🇾',Internasional:'🌐'} as {[key:string]:string})[country]||'🌐';}
+
+type ContentView='all'|'news'|'video'|'audio'|'print';
+const contentViews:{id:ContentView;label:string}[]=[{id:'all',label:'All'},{id:'news',label:'News'},{id:'video',label:'Video'},{id:'audio',label:'Audio'},{id:'print',label:'Media Cetak'}];
+function contentViewFor(record:Record):Exclude<ContentView,'all'>{
+  const value=`${record.platform} ${record.source} ${record.evidenceType} ${record.account}`.toLowerCase();
+  if(/youtube|tiktok|video|televisi|\btv\b/.test(value))return 'video';
+  if(/radio|podcast|audio/.test(value))return 'audio';
+  if(/print|media cetak|koran|majalah|newspaper/.test(value))return 'print';
+  return 'news';
+}
 
 function classifySourceGroup(item:LiveItem):SourceGroup{
   const value=`${item.platform||''} ${item.source}`.toLowerCase();
@@ -111,6 +121,7 @@ export function AspirasiWarga(){
   const [itemOverrides,setItemOverrides]=useState<{[id:string]:Partial<Record>}>({});
   const items=useMemo(()=>live.items.map(mapLiveRecord).map(record=>({...record,...itemOverrides[record.id]})),[live.items,itemOverrides]);
   const [sources,setSources]=useState<string[]>([]);
+  const [contentView,setContentView]=useState<ContentView>('all');
   const [query,setQuery]=useState('');
   const [topic,setTopic]=useState('Semua topik');
   const [sentiment,setSentiment]=useState('Semua sentimen');
@@ -133,7 +144,7 @@ export function AspirasiWarga(){
   const contentRequests=useRef(new Set<string>());
 
   const hasFinding=(record:Record)=>findings.some(finding=>finding.evidence.some(evidence=>evidence.author===record.name&&evidence.transcript===record.text));
-  const shown=items.filter(record=>(!sources.length||sources.includes(record.platform))&&(topic==='Semua topik'||record.topic===topic)&&(sentiment==='Semua sentimen'||record.sentiment===sentiment)&&(location==='Semua kecamatan'||record.location===location)&&(village==='Semua desa/kelurahan'||record.village===village)&&(language==='Semua bahasa'||record.language===language)&&(country==='Semua negara'||record.country===country)&&(validation==='Semua validitas'||(validation==='Valid'?record.validationStatus==='valid':record.validationStatus==='unreviewed'))&&(newState==='Semua status'||(newState==='New')===record.isNew)&&(account==='Semua media / akun'||record.account===account)&&(actor==='Semua actor / entity'||record.actor===actor)&&(severity==='Semua severity'||record.severity===severity)&&(findingState==='Semua'||(findingState==='Sudah ada Finding')===hasFinding(record))&&(!query.trim()||`${record.text} ${record.translation||''} ${record.name} ${record.account} ${record.topic} ${record.actor}`.toLowerCase().includes(query.toLowerCase())));
+  const shown=items.filter(record=>(contentView==='all'||contentViewFor(record)===contentView)&&(!sources.length||sources.includes(record.platform))&&(topic==='Semua topik'||record.topic===topic)&&(sentiment==='Semua sentimen'||record.sentiment===sentiment)&&(location==='Semua kecamatan'||record.location===location)&&(village==='Semua desa/kelurahan'||record.village===village)&&(language==='Semua bahasa'||record.language===language)&&(country==='Semua negara'||record.country===country)&&(validation==='Semua validitas'||(validation==='Valid'?record.validationStatus==='valid':record.validationStatus==='unreviewed'))&&(newState==='Semua status'||(newState==='New')===record.isNew)&&(account==='Semua media / akun'||record.account===account)&&(actor==='Semua actor / entity'||record.actor===actor)&&(severity==='Semua severity'||record.severity===severity)&&(findingState==='Semua'||(findingState==='Sudah ada Finding')===hasFinding(record))&&(!query.trim()||`${record.text} ${record.translation||''} ${record.name} ${record.account} ${record.topic} ${record.actor}`.toLowerCase().includes(query.toLowerCase())));
   const values=(key:keyof Pick<Record,'topic'|'location'|'village'|'language'|'country'|'account'|'actor'>)=>Array.from(new Set(items.map(record=>String(record[key]))));
   const pageCount=Math.max(1,Math.ceil(shown.length/pageSize));
   const currentPage=Math.min(page,pageCount);
@@ -144,13 +155,14 @@ export function AspirasiWarga(){
   const openFinding=(record:Record)=>setModal({type:'finding',records:selected.length?items.filter(item=>selected.includes(item.id)):[record]});
   const updateClassification=(recordId:string,patch:Partial<Pick<Record,'topic'|'sentiment'|'severity'|'actor'|'location'|'village'>>,reason:string,changes:Change[])=>{const record=items.find(item=>item.id===recordId);if(!record)return;setItemOverrides(current=>({...current,[recordId]:{...current[recordId],...patch,classified:true,history:[...record.history,{id:`${record.id}-${Date.now()}`,actor:'Budi Santoso',at:new Date().toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}),reason,changes}]}}));void fetch(`/api/intelligence/items/${recordId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({...patch,reason,changes})}).then(()=>live.refresh())};
   const markViewed=(recordId:string)=>setItemOverrides(current=>({...current,[recordId]:{...current[recordId],isNew:false}}));
-  const resetFilters=()=>{setSources([]);setQuery('');setTopic('Semua topik');setSentiment('Semua sentimen');setLocation('Semua kecamatan');setVillage('Semua desa/kelurahan');setLanguage('Semua bahasa');setCountry('Semua negara');setValidation('Semua validitas');setNewState('Semua status');setAccount('Semua media / akun');setActor('Semua actor / entity');setFindingState('Semua');setSeverity('Semua severity');};
+  const resetFilters=()=>{setContentView('all');setSources([]);setQuery('');setTopic('Semua topik');setSentiment('Semua sentimen');setLocation('Semua kecamatan');setVillage('Semua desa/kelurahan');setLanguage('Semua bahasa');setCountry('Semua negara');setValidation('Semua validitas');setNewState('Semua status');setAccount('Semua media / akun');setActor('Semua actor / entity');setFindingState('Semua');setSeverity('Semua severity');};
   const viewed=modal?.type==='viewer'?items.find(record=>record.id===modal.recordId):undefined;
   const broadcastRecord=modal?.type==='broadcast'?items.find(record=>record.id===modal.recordId):undefined;
 
   return <section className={styles.root}>
     <div className={styles.heading}><div><h2>Aspirasi & Percakapan Warga</h2><p>Data publik Kabupaten Badung yang masuk dari crawler dan tersimpan di Supabase.</p></div><span>{live.loading?'MEMUAT DATA LIVE':`${items.filter(record=>record.isNew).length} NEW · ${items.length} DATA LIVE`}</span></div>
     <div className={styles.realDataNotice}><span>{live.error?'!':'✓'}</span><div><b>{live.error?'Koneksi data bermasalah':live.configured?'Live data connected':'Sumber belum terhubung'}</b><p>{live.error||'Hanya data yang benar-benar diterima crawler yang ditampilkan. URL sumber disimpan sebagai evidence.'}</p></div><small>{live.generatedAt?`Diperbarui · ${formatLiveTime(live.generatedAt)}`:'Belum ada sinkronisasi'}</small></div>
+    <nav className={styles.contentTypeTabs} aria-label="Tipe konten aspirasi">{contentViews.map(view=>{const count=view.id==='all'?items.length:items.filter(record=>contentViewFor(record)===view.id).length;return <button key={view.id} className={contentView===view.id?styles.activeContentType:''} aria-current={contentView===view.id?'page':undefined} onClick={()=>{setContentView(view.id);setPage(1)}}>{view.label}<em>{count}</em></button>})}</nav>
     <div className={styles.sourceGroups}>{sourceGroups.map(group=>{const selectedGroup=group.platforms.some(platform=>sources.includes(platform));return <article key={group.name} className={selectedGroup?styles.selectedGroup:''}><button className={styles.groupButton} onClick={()=>toggleGroup(group.platforms)}><b>{group.name}</b><small>{group.platforms.join(', ')}</small></button><div>{group.platforms.map(platform=><button key={platform} className={sources.includes(platform)?styles.activeSource:''} onClick={()=>toggleSource(platform)}>{platform}<em>{items.filter(record=>record.platform===platform).length}</em></button>)}</div></article>;})}</div>
     <div className={styles.filters}>
       <label className={styles.searchField}>Free text<input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Cari percakapan, akun, topik..."/></label>

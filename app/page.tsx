@@ -179,6 +179,7 @@ function GovernmentDataSources(){
   const liveItems=live.items;
   const isSocial=(value:string)=>/instagram|facebook|tiktok|youtube|reddit|twitter|\bx\b|social|telegram/.test(value.toLowerCase());
   const initials=(value:string)=>value.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase()||'—';
+  const countryFlag=(country:string)=>({Indonesia:'🇮🇩',Australia:'🇦🇺','Hong Kong':'🇭🇰',Jepang:'🇯🇵',Jerman:'🇩🇪',Inggris:'🇬🇧',Singapura:'🇸🇬',Prancis:'🇫🇷','Amerika Serikat':'🇺🇸',Rusia:'🇷🇺',Ukraina:'🇺🇦',Internasional:'🌐'} as Record<string,string>)[country]||'🌐';
   const rows=useMemo(()=>{
     type DirectoryRow={name:string;detail:string;country:string;origin:string;status:string;volume:number;sync:string;initial:string;tone:string;media?:string};
     const group=(keyFor:(item:LiveItem)=>string|null, include:(item:LiveItem)=>boolean, authorMode=false)=>{
@@ -190,7 +191,7 @@ function GovernmentDataSources(){
       return [...map.entries()].map(([name,value]):DirectoryRow=>{
         const latest=[...value.items].sort((a,b)=>new Date(b.lastSeenAt).getTime()-new Date(a.lastSeenAt).getTime())[0];
         const platforms=Array.from(new Set(value.items.map(item=>item.platform||item.source))).filter(Boolean);
-        return {name,detail:authorMode?(value.media.size?[...value.media].slice(0,3).join(' · '):platforms.join(' · ')):platforms.join(' · '),country:latest.country||'Belum tersedia',origin:latest.location||latest.source||'Belum tersedia',status:'Live',volume:value.items.length,sync:formatLiveTime(latest.lastSeenAt),initial:initials(name),tone:(latest.platform||latest.source).toLowerCase(),media:authorMode?`${value.media.size} media`:undefined};
+        return {name,detail:authorMode?(value.media.size?[...value.media].slice(0,3).join(' · '):platforms.join(' · ')):platforms.join(' · '),country:latest.country||'Belum tersedia',origin:latest.location||latest.source||'Belum tersedia',status:authorMode?'Teridentifikasi':isSocial(`${latest.platform||''} ${latest.source}`)?'Terhubung':'Terpantau',volume:value.items.length,sync:formatLiveTime(latest.lastSeenAt),initial:initials(name),tone:(latest.platform||latest.source).toLowerCase(),media:authorMode?`${value.media.size} media`:undefined};
       }).sort((a,b)=>b.volume-a.volume);
     };
     return {
@@ -220,10 +221,10 @@ function GovernmentDataSources(){
     <section className="card source-directory">
       <div className="source-directory-head"><div><h3>{sourceView==="social"?"Social Media":sourceView==="media"?"Media terpantau":"Direktori penulis"}</h3><p>{sourceView==="authors"?"Relasi penulis dan media dihitung dari artikel yang tersimpan.":"Negara dan asal ditampilkan jika tersedia pada metadata sumber."}</p></div><div className="source-search">⌕ <input value={sourceQuery} onChange={event=>setSourceQuery(event.target.value)} placeholder={`Cari ${sourceView==="authors"?"penulis":"sumber"}...`} aria-label="Cari sumber data"/></div></div>
       <div className={`source-list ${sourceView==="authors"?"authors":""}`}>
-        <div className="source-list-row source-list-head"><span>{sourceView==="authors"?"PENULIS":"SUMBER / AKUN"}</span><span>NEGARA</span><span>ASAL</span>{sourceView==="authors"&&<span>MEDIA</span>}<span>STATUS</span><span>{volumeLabel}</span>{sourceView!=="authors"&&<span>LAST SEEN</span>}</div>
+        <div className="source-list-row source-list-head"><span>{sourceView==="authors"?"PENULIS":"SUMBER / AKUN"}</span><span>NEGARA</span><span>ASAL</span>{sourceView==="authors"&&<span>MEDIA</span>}<span>STATUS</span><span>{volumeLabel}</span>{sourceView!=="authors"&&<span>LAST SYNC</span>}</div>
         {filteredRows.map((item,index)=><div className="source-list-row source-list-item" key={`${item.name}-${index}`}>
           <span className="source-entity"><i className={`source-directory-avatar ${item.tone||""}`}>{item.initial}</i><span><b>{item.name}</b><small>{item.detail||'Metadata kanal belum tersedia'}</small></span></span>
-          <span className="source-country"><i>◉</i><b>{item.country}</b></span>
+          <span className="source-country"><i>{countryFlag(item.country)}</i><b>{item.country}</b></span>
           <span className="source-origin">{item.origin}</span>
           {sourceView==="authors"&&<span className="source-media-count">{item.media}</span>}
           <span><em className="connection">● {item.status}</em></span>
