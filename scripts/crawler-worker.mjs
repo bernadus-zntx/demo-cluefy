@@ -233,6 +233,12 @@ function isRelevantForeignContent(content) {
   return /\bbadung\b|\bkuta\b|\bcanggu\b|\bseminyak\b|\bnusa dua\b|\btanjung benoa\b|\buluwatu\b|\bjimbaran\b|\blegian\b|\bkerobokan\b|\bbali\b|\bdenpasar\b|\brenon\b|\bsesetan\b|バリ|クタ|チャングー|バドゥン|бали|балі|кута|чангу|бадунг|семиньяк|нуса-дуа/i.test(content);
 }
 
+function isClearlyOutsideArea(content) {
+  const local = /\bbadung\b|\bkuta\b|\bcanggu\b|\bseminyak\b|\bnusa dua\b|\btanjung benoa\b|\buluwatu\b|\bjimbaran\b|\blegian\b|\bkerobokan\b|\bmengwi\b|\bmangupura\b/i.test(content);
+  const outside = /\bbalikpapan\b|\blampung\b|\bbangli\b|\bjakarta\b|\bsurabaya\b|\bbandung\b|\byogyakarta\b|\bmakassar\b|\bmedan\b|\bsamarinda\b/i.test(content);
+  return outside && !local;
+}
+
 async function translateFallback(value, language) {
   try {
     const url = new URL("https://api.mymemory.translated.net/get");
@@ -290,7 +296,9 @@ async function parseFeed(xml, rule, existingTranslations, social = null) {
     const cleanTitle = title.endsWith(` - ${indexedPublisher}`) ? title.slice(0, -(indexedPublisher.length + 3)) : title;
     const publisher = isSocial ? configuredAccount || `${social.platform} Public` : indexedPublisher;
     const excerpt = text(tag(block, "description"));
-    if ((isSocial || profile.language !== "id") && !isRelevantForeignContent(`${cleanTitle} ${excerpt}`)) return [];
+    const evidenceText = `${cleanTitle} ${excerpt}`;
+    if (isSocial && (isClearlyOutsideArea(evidenceText) || !isRelevantForeignContent(evidenceText))) return [];
+    if (!isSocial && profile.language !== "id" && !isRelevantForeignContent(evidenceText)) return [];
     const publishedAt = tag(block, "pubDate");
     const publishedDate = publishedAt ? new Date(publishedAt) : null;
     if (publishedDate && Number.isFinite(publishedDate.getTime()) && publishedDate < crawlSince) return [];
