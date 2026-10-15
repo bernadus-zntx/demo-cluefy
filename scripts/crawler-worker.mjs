@@ -12,6 +12,7 @@ if (!apiKey) throw new Error("CRAWLER_API_KEY belum tersedia.");
 
 const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 const translationCache = new Map();
+let redditLastRequestAt = 0;
 
 const aiSchema = {
   type: "object",
@@ -338,7 +339,7 @@ async function parseRedditFeed(xml, rule, existingTranslations) {
   const candidates = blocks.slice(0, 25).flatMap(block => {
     const title = text(tag(block, "title"));
     const body = text(tag(block, "content"));
-    const url = attribute(block, "link", "href", { name: "rel", value: "alternate" });
+    const url = attribute(block, "link", "href", { name: "rel", value: "alternate" }) || attribute(block, "link", "href");
     const externalId = text(tag(block, "id")) || url;
     const author = text(tag(tag(block, "author"), "name"));
     const subreddit = attribute(block, "category", "label").replace(/^r\//i, "") || "Reddit";
@@ -408,10 +409,19 @@ async function crawlRedditRule(rule, existingTranslations) {
   feedUrl.searchParams.set("sort", "new");
   feedUrl.searchParams.set("t", "month");
   if (subreddit) feedUrl.searchParams.set("restrict_sr", "on");
-  const response = await fetch(feedUrl, {
-    headers: { "User-Agent": "ClueFyCrawler/1.0 (public-monitoring)" },
-    signal: AbortSignal.timeout(20000),
-  });
+  const waitBeforeRequest = Math.max(0, 3000 - (Date.now() - redditLastRequestAt));
+  if (waitBeforeRequest) await new Promise(resolve => setTimeout(resolve, waitBeforeRequest));
+  let response;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    response = await fetch(feedUrl, {
+      headers: { "User-Agent": "ClueFyCrawler/1.0 (public-monitoring)" },
+      signal: AbortSignal.timeout(20000),
+    });
+    redditLastRequestAt = Date.now();
+    if (response.status !== 429 || attempt === 1) break;
+    const retrySeconds = Math.min(15, Math.max(5, Number(response.headers.get("retry-after")) || 8));
+    await new Promise(resolve => setTimeout(resolve, retrySeconds * 1000));
+  }
   if (!response.ok) throw new Error(`${rule.code}: Reddit RSS ${response.status}`);
   const items = await parseRedditFeed(await response.text(), rule, existingTranslations);
   return { rule, items: items.slice(0, 25) };
