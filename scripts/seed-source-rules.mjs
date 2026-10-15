@@ -25,6 +25,10 @@ const rules=[
   ['Keyword','Badung OR "Kuta Bali" OR Canggu OR Seminyak OR "Nusa Dua" OR Jimbaran OR Uluwatu','Reddit Public RSS','Global','Pantau posting Reddit publik tentang Badung dan Bali selatan melalui RSS tanpa login'],
   ['Group Social','r/bali','Reddit Public RSS','Bali · Indonesia','Pantau posting publik r/bali yang berkaitan dengan Badung, Kuta, Canggu, dan sekitarnya'],
   ['Group Social','r/indonesia','Reddit Public RSS','Indonesia','Pantau posting publik r/indonesia yang berkaitan dengan Kabupaten Badung dan Bali selatan'],
+  ['Akun Social','baliinfoofficial','Facebook Public Page','Bali · Indonesia','Pantau posting publik https://www.facebook.com/baliinfoofficial'],
+  ['Akun Social','OfficialBadungTourism','Facebook Public Page','Badung · Indonesia','Pantau posting publik https://www.facebook.com/OfficialBadungTourism'],
+  ['Akun Social','tribunbali','Facebook Public Page','Bali · Indonesia','Pantau posting publik https://www.facebook.com/tribunbali'],
+  ['Akun Social','UnikNews1','Facebook Public Page','Bali · Indonesia','Pantau posting publik https://www.facebook.com/UnikNews1'],
 ];
 
 const response=await fetch(`${baseUrl}/api/crawler-config`,{cache:'no-store'});
