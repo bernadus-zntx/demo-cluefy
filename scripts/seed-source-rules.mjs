@@ -22,6 +22,9 @@ const rules=[
   ['URL','apnews.com','Media Asing · English · USA','Amerika Serikat · English','Pantau AP News sejak 1 Oktober 2026'],
   ['URL','cnn.com','Media Asing · English · USA','Amerika Serikat · English','Pantau CNN sejak 1 Oktober 2026'],
   ['URL','usatoday.com','Media Asing · English · USA','Amerika Serikat · English','Pantau USA Today sejak 1 Oktober 2026'],
+  ['Keyword','Badung OR "Kuta Bali" OR Canggu OR Seminyak OR "Nusa Dua" OR Jimbaran OR Uluwatu','Reddit Public RSS','Global','Pantau posting Reddit publik tentang Badung dan Bali selatan melalui RSS tanpa login'],
+  ['Group Social','r/bali','Reddit Public RSS','Bali · Indonesia','Pantau posting publik r/bali yang berkaitan dengan Badung, Kuta, Canggu, dan sekitarnya'],
+  ['Group Social','r/indonesia','Reddit Public RSS','Indonesia','Pantau posting publik r/indonesia yang berkaitan dengan Kabupaten Badung dan Bali selatan'],
 ];
 
 const response=await fetch(`${baseUrl}/api/crawler-config`,{cache:'no-store'});

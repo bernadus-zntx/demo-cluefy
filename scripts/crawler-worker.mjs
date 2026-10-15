@@ -129,6 +129,23 @@ function source(block) {
   return text(block.match(/<source(?:\s[^>]*)?>([\s\S]*?)<\/source>/i)?.[1] || "");
 }
 
+function attribute(block, tagName, attributeName, requiredAttribute = null) {
+  const tags = block.match(new RegExp(`<${tagName}\\b[^>]*>`, "gi")) || [];
+  const selected = tags.find(value => !requiredAttribute || new RegExp(`${requiredAttribute.name}=["']${requiredAttribute.value}["']`, "i").test(value));
+  return decodeXml(selected?.match(new RegExp(`${attributeName}=["']([^"']*)["']`, "i"))?.[1] || "").trim();
+}
+
+function detectedPostLanguage(value) {
+  const normalized = ` ${value.toLowerCase()} `;
+  const indonesianSignals = normalized.match(/\b(yang|dan|untuk|dengan|tidak|dari|ini|itu|pada|ada|kami|warga|pemerintah|jalan|pantai)\b/g)?.length || 0;
+  return indonesianSignals >= 2 ? "id" : "en";
+}
+
+function isRelevantRedditContent(value, subreddit) {
+  if (/badung|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan/i.test(value)) return true;
+  return /^(bali|indonesia)$/i.test(subreddit) && /\bkuta\b/i.test(value);
+}
+
 function feedProfile(rule) {
   const hint = `${rule.source || ""} ${rule.scope || ""} ${rule.note || ""}`.toLowerCase();
   const profiles = [
@@ -316,6 +333,90 @@ async function parseFeed(xml, rule, existingTranslations, social = null) {
   });
 }
 
+async function parseRedditFeed(xml, rule, existingTranslations) {
+  const blocks = xml.match(/<entry\b[\s\S]*?<\/entry>/gi) || [];
+  const candidates = blocks.slice(0, 25).flatMap(block => {
+    const title = text(tag(block, "title"));
+    const body = text(tag(block, "content"));
+    const url = attribute(block, "link", "href", { name: "rel", value: "alternate" });
+    const externalId = text(tag(block, "id")) || url;
+    const author = text(tag(tag(block, "author"), "name"));
+    const subreddit = attribute(block, "category", "label").replace(/^r\//i, "") || "Reddit";
+    if (!title || !url || !isRelevantRedditContent(`${title} ${body}`, subreddit)) return [];
+    const publishedAt = tag(block, "published") || tag(block, "updated");
+    const publishedDate = publishedAt ? new Date(publishedAt) : null;
+    if (publishedDate && Number.isFinite(publishedDate.getTime()) && publishedDate < crawlSince) return [];
+    const language = detectedPostLanguage(`${title} ${body}`);
+    const analysis = classify(`${title} ${body}`);
+    return [{
+      ruleId: rule.id,
+      source: "Reddit Public RSS",
+      externalId,
+      url,
+      title,
+      excerpt: body || undefined,
+      author: author || undefined,
+      publisher: `r/${subreddit}`,
+      platform: "Reddit",
+      language,
+      country: "Internasional",
+      location: analysis.location || undefined,
+      publishedAt: publishedDate && Number.isFinite(publishedDate.getTime()) ? publishedDate.toISOString() : undefined,
+      rawPayload: {
+        adapter: "reddit-public-rss",
+        queryRule: rule.code,
+        topic: analysis.topic,
+        sentiment: analysis.sentiment,
+        severity: analysis.severity,
+        sourceGroup: "Social Media",
+        evidenceType: "Percakapan Publik",
+        discoveryMethod: "public-rss",
+        connectionType: "Public Feed",
+        subreddit: `r/${subreddit}`,
+        sourceNote: "Posting publik Reddit ditemukan melalui RSS resmi tanpa login. Judul, isi publik, akun, subreddit, URL, dan waktu publikasi disimpan sebagai evidence.",
+        ai: analysis.topic || analysis.sentiment ? {
+          summary: title,
+          recommendation: "Review konteks posting dan diskusi sumber sebelum menentukan tindak lanjut.",
+          confidence: 0.55,
+          entities: analysis.location ? [analysis.location] : [],
+        } : undefined,
+      },
+    }];
+  });
+  for (const item of candidates) {
+    if (item.language === "id") continue;
+    const existing = existingTranslations.get(item.externalId);
+    const translation = existing || (await translateBatchToIndonesian([item.title], item.language))[0] || null;
+    if (!translation) continue;
+    item.translationNeedsSave = Boolean(!existing);
+    item.rawPayload.translation = translation;
+    item.rawPayload.translationProvider = "Automated translation demo";
+  }
+  return candidates;
+}
+
+async function crawlRedditRule(rule, existingTranslations) {
+  const groupRule = rule.type === "Group Social";
+  const subreddit = groupRule
+    ? rule.value.trim().replace(/^https?:\/\/(?:www\.)?reddit\.com\/r\//i, "").replace(/^r\//i, "").split("/")[0]
+    : null;
+  const query = groupRule
+    ? '(Badung OR "Kuta Bali" OR Canggu OR Seminyak OR "Nusa Dua" OR Jimbaran OR Uluwatu OR Legian OR Kerobokan)'
+    : rule.value.trim();
+  const feedUrl = new URL(subreddit ? `https://www.reddit.com/r/${encodeURIComponent(subreddit)}/search.rss` : "https://www.reddit.com/search.rss");
+  feedUrl.searchParams.set("q", query);
+  feedUrl.searchParams.set("sort", "new");
+  feedUrl.searchParams.set("t", "month");
+  if (subreddit) feedUrl.searchParams.set("restrict_sr", "on");
+  const response = await fetch(feedUrl, {
+    headers: { "User-Agent": "ClueFyCrawler/1.0 (public-monitoring)" },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!response.ok) throw new Error(`${rule.code}: Reddit RSS ${response.status}`);
+  const items = await parseRedditFeed(await response.text(), rule, existingTranslations);
+  return { rule, items: items.slice(0, 25) };
+}
+
 async function crawlDirectArticle(rule, existingTranslations) {
   const url = directArticleUrl(rule);
   if (!url) return null;
@@ -393,6 +494,7 @@ async function api(path, options = {}) {
 }
 
 async function crawlRule(rule, existingTranslations) {
+  if (configuredSocialPlatforms(rule).some(item => item.platform === "Reddit")) return crawlRedditRule(rule, existingTranslations);
   const direct = await crawlDirectArticle(rule, existingTranslations);
   if (direct) return direct;
   const profile = feedProfile(rule);
