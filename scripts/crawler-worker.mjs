@@ -230,7 +230,7 @@ function classify(content) {
 }
 
 function isRelevantForeignContent(content) {
-  return /badung|kuta|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan|bali|バリ|クタ|チャングー|バドゥン|бали|балі|кута|чангу|бадунг|семиньяк|нуса-дуа/i.test(content);
+  return /\bbadung\b|\bkuta\b|\bcanggu\b|\bseminyak\b|\bnusa dua\b|\btanjung benoa\b|\buluwatu\b|\bjimbaran\b|\blegian\b|\bkerobokan\b|\bbali\b|\bdenpasar\b|\brenon\b|\bsesetan\b|バリ|クタ|チャングー|バドゥン|бали|балі|кута|чангу|бадунг|семиньяк|нуса-дуа/i.test(content);
 }
 
 async function translateFallback(value, language) {
@@ -290,7 +290,7 @@ async function parseFeed(xml, rule, existingTranslations, social = null) {
     const cleanTitle = title.endsWith(` - ${indexedPublisher}`) ? title.slice(0, -(indexedPublisher.length + 3)) : title;
     const publisher = isSocial ? configuredAccount || `${social.platform} Public` : indexedPublisher;
     const excerpt = text(tag(block, "description"));
-    if (profile.language !== "id" && !isRelevantForeignContent(`${cleanTitle} ${excerpt}`)) return [];
+    if ((isSocial || profile.language !== "id") && !isRelevantForeignContent(`${cleanTitle} ${excerpt}`)) return [];
     const publishedAt = tag(block, "pubDate");
     const publishedDate = publishedAt ? new Date(publishedAt) : null;
     if (publishedDate && Number.isFinite(publishedDate.getTime()) && publishedDate < crawlSince) return [];
