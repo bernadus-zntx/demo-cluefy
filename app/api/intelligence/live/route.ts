@@ -29,6 +29,10 @@ function text(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function isIndonesianLanguage(value: string | null) {
+  return /^(id|id-id|indonesian|bahasa indonesia)$/i.test(value?.trim() ?? "");
+}
+
 function isRelevantItem(row: CrawlRow) {
   if (row.platform !== "Media Asing") return true;
   const content = `${row.title} ${row.excerpt ?? ""} ${row.body ?? ""}`;
@@ -62,7 +66,7 @@ function itemFromRow(row: CrawlRow) {
     severity: text(raw.severity),
     village: text(raw.village),
     actor: text(raw.actor),
-    translation: text(raw.translation),
+    translation: isIndonesianLanguage(row.language) ? null : text(raw.translation),
     validationStatus: text(raw.validationStatus) ?? "unreviewed",
     validatedBy: text(raw.validatedBy),
     validatedAt: text(raw.validatedAt),

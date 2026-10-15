@@ -49,7 +49,7 @@ async function enrichWithOpenAI(item) {
     body: JSON.stringify({
       model: openAiModel, store: false, reasoning: { effort: "none" },
       input: [
-        { role: "system", content: "Anda adalah analis media ClueFy untuk Pemerintah Kabupaten Badung. Analisis hanya dari bukti yang diberikan. Tulis ringkasan, temuan, rekomendasi, dan alasan relevansi dalam Bahasa Indonesia yang singkat dan operasional. relevant hanya true bila konten berdampak atau berkaitan nyata dengan Badung, Kuta, Canggu, Seminyak, Nusa Dua, Jimbaran, Uluwatu, Legian, Kerobokan, atau layanan Pemkab Badung. Untuk data yang tidak tersedia gunakan string kosong; jangan mengarang nama orang, desa, atau lokasi." },
+        { role: "system", content: "Anda adalah analis media ClueFy untuk Pemerintah Kabupaten Badung. Analisis hanya dari bukti yang diberikan. Tulis ringkasan, temuan, rekomendasi, dan alasan relevansi dalam Bahasa Indonesia yang singkat dan operasional. Field translation khusus untuk terjemahan ke Bahasa Indonesia: bila language adalah id, id-ID, Indonesian, atau Bahasa Indonesia, translation wajib string kosong; jangan pernah menerjemahkan konten Indonesia ke bahasa lain. relevant hanya true bila konten berdampak atau berkaitan nyata dengan Badung, Kuta, Canggu, Seminyak, Nusa Dua, Jimbaran, Uluwatu, Legian, Kerobokan, atau layanan Pemkab Badung. Untuk data yang tidak tersedia gunakan string kosong; jangan mengarang nama orang, desa, atau lokasi." },
         { role: "user", content: JSON.stringify({
           title: item.title || "", content: sourceContent, publisher: item.publisher || "", author: item.author || "",
           language: item.language || "", country: item.country || "", detectedLocation: item.location || "",

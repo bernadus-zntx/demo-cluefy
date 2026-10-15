@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = getSupabaseAdmin();
   const ids = Array.from(new Set(items.map(item => item.id)));
-  const { data: rows, error: selectError } = await supabase.from("crawl_items").select("id,location,raw_payload").in("id", ids);
+  const { data: rows, error: selectError } = await supabase.from("crawl_items").select("id,location,language,raw_payload").in("id", ids);
   if (selectError) return NextResponse.json({ error: selectError.message }, { status: 500 });
 
   const byId = new Map(items.map(item => [item.id, item]));
@@ -51,7 +51,9 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     const wasHumanEdited = Array.isArray(raw.classificationHistory) && raw.classificationHistory.length > 0;
     const nextRaw: Record<string, unknown> = { ...raw };
-    if (enrichment.translation?.trim()) {
+    const isIndonesian=/^(id|id-id|indonesian|bahasa indonesia)$/i.test(String(row.language||'').trim());
+    if(isIndonesian){delete nextRaw.translation;delete nextRaw.translationProvider;delete nextRaw.translatedAt;}
+    if (!isIndonesian&&enrichment.translation?.trim()) {
       nextRaw.translation = enrichment.translation.trim();
       nextRaw.translationProvider = enrichment.provider || "Automated translation";
       nextRaw.translatedAt = now;
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
       nextRaw.aiProvider = "OpenAI";
       nextRaw.aiModel = enrichment.model || "gpt-6-luna";
       nextRaw.aiEnrichedAt = now;
-      if (!nextRaw.translation && ai.translation.trim()) {
+      if (!isIndonesian&&!nextRaw.translation && ai.translation.trim()) {
         nextRaw.translation = ai.translation.trim();
         nextRaw.translationProvider = `OpenAI · ${enrichment.model || "gpt-6-luna"}`;
         nextRaw.translatedAt = now;
