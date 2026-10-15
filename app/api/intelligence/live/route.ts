@@ -29,6 +29,10 @@ function text(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function publisherKey(value: string | null) {
+  return value?.normalize("NFKC").trim().toLocaleLowerCase("id-ID").replace(/\s+/g, " ") ?? "";
+}
+
 function isIndonesianLanguage(value: string | null) {
   return /^(id|id-id|indonesian|bahasa indonesia)$/i.test(value?.trim() ?? "");
 }
@@ -39,7 +43,7 @@ function isRelevantItem(row: CrawlRow) {
   return /badung|kuta|canggu|seminyak|nusa dua|tanjung benoa|uluwatu|jimbaran|legian|kerobokan|bali|バリ|クタ|チャングー|バドゥン|бали|балі|кута|чангу|бадунг|семиньяк|нуса-дуа/i.test(content);
 }
 
-function itemFromRow(row: CrawlRow) {
+function itemFromRow(row: CrawlRow, partnerPublishers: Set<string>) {
   const raw = row.raw_payload ?? {};
   const ai = typeof raw.ai === "object" && raw.ai ? raw.ai as Record<string, unknown> : {};
   return {
@@ -76,6 +80,7 @@ function itemFromRow(row: CrawlRow) {
     sourceNote: text(raw.sourceNote),
     reach: typeof raw.reach === "number" ? raw.reach : null,
     engagement: typeof raw.engagement === "number" ? raw.engagement : null,
+    mediaPartner: partnerPublishers.has(publisherKey(row.publisher ?? row.source)),
     ai: {
       summary: text(ai.summary),
       finding: text(ai.finding),
@@ -105,10 +110,13 @@ export async function GET() {
   const error = itemsResult.error ?? rulesResult.error ?? runsResult.error;
   if (error) return NextResponse.json({ configured: true, error: error.message }, { status: 500 });
 
+  const relevantRows = (itemsResult.data ?? []).filter(row => isRelevantItem(row as CrawlRow)) as CrawlRow[];
+  const partnerPublishers = new Set(relevantRows.filter(row => row.raw_payload?.mediaPartner === true).map(row => publisherKey(row.publisher ?? row.source)).filter(Boolean));
+
   return NextResponse.json({
     configured: true,
     generatedAt: new Date().toISOString(),
-    items: (itemsResult.data ?? []).filter(row => isRelevantItem(row as CrawlRow)).map(row => itemFromRow(row as CrawlRow)),
+    items: relevantRows.map(row => itemFromRow(row, partnerPublishers)),
     rules: rulesResult.data ?? [],
     runs: runsResult.data ?? [],
   }, { headers: { "Cache-Control": "private, no-store" } });

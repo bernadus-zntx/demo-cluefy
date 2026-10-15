@@ -175,6 +175,8 @@ function GovernmentDataSources(){
   const [section,setSection]=useState<"directory"|"crawler">("directory");
   const [sourceView,setSourceView]=useState<"social"|"media"|"authors">("social");
   const [sourceQuery,setSourceQuery]=useState("");
+  const [partnerSaving,setPartnerSaving]=useState<string|null>(null);
+  const [partnerError,setPartnerError]=useState<string|null>(null);
   const live=useLiveIntelligence();
   const liveItems=live.items;
   const isSocial=(value:string)=>/instagram|facebook|tiktok|youtube|reddit|twitter|\bx\b|social|telegram/.test(value.toLowerCase());
@@ -182,7 +184,7 @@ function GovernmentDataSources(){
   const initials=(value:string)=>value.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase()||'—';
   const countryFlag=(country:string)=>({Indonesia:'🇮🇩',Australia:'🇦🇺','Hong Kong':'🇭🇰',Jepang:'🇯🇵',Jerman:'🇩🇪',Inggris:'🇬🇧',Singapura:'🇸🇬',Prancis:'🇫🇷','Amerika Serikat':'🇺🇸',Rusia:'🇷🇺',Ukraina:'🇺🇦',Internasional:'🌐'} as Record<string,string>)[country]||'🌐';
   const rows=useMemo(()=>{
-    type DirectoryRow={name:string;detail:string;country:string;origin:string;status:string;volume:number;sync:string;initial:string;tone:string;media?:string};
+    type DirectoryRow={name:string;detail:string;country:string;origin:string;status:string;volume:number;sync:string;initial:string;tone:string;media?:string;partner:boolean};
     const group=(keyFor:(item:LiveItem)=>string|null, include:(item:LiveItem)=>boolean, authorMode=false)=>{
       const map=new Map<string,{items:LiveItem[];media:Set<string>}>();
       liveItems.filter(include).forEach(item=>{
@@ -192,7 +194,7 @@ function GovernmentDataSources(){
       return [...map.entries()].map(([name,value]):DirectoryRow=>{
         const latest=[...value.items].sort((a,b)=>new Date(b.lastSeenAt).getTime()-new Date(a.lastSeenAt).getTime())[0];
         const platforms=Array.from(new Set(value.items.map(item=>item.platform||item.source))).filter(Boolean);
-        return {name,detail:authorMode?(value.media.size?[...value.media].slice(0,3).join(' · '):platforms.join(' · ')):platforms.join(' · '),country:latest.country||'Belum tersedia',origin:latest.location||latest.source||'Belum tersedia',status:authorMode?'Teridentifikasi':isSocial(`${latest.platform||''} ${latest.source}`)?'Terhubung':'Terpantau',volume:value.items.length,sync:formatLiveTime(latest.lastSeenAt),initial:initials(name),tone:(latest.platform||latest.source).toLowerCase(),media:authorMode?`${value.media.size} media`:undefined};
+        return {name,detail:authorMode?(value.media.size?[...value.media].slice(0,3).join(' · '):platforms.join(' · ')):platforms.join(' · '),country:latest.country||'Belum tersedia',origin:latest.location||latest.source||'Belum tersedia',status:authorMode?'Teridentifikasi':isSocial(`${latest.platform||''} ${latest.source}`)?'Terhubung':'Terpantau',volume:value.items.length,sync:formatLiveTime(latest.lastSeenAt),initial:initials(name),tone:(latest.platform||latest.source).toLowerCase(),media:authorMode?`${value.media.size} media`:undefined,partner:value.items.some(item=>item.mediaPartner)};
       }).sort((a,b)=>b.volume-a.volume);
     };
     return {
@@ -205,6 +207,16 @@ function GovernmentDataSources(){
   const filteredRows=activeRows.filter(item=>`${item.name} ${item.detail} ${item.country} ${item.origin}`.toLowerCase().includes(sourceQuery.toLowerCase()));
   const countries=new Set(liveItems.map(item=>item.country).filter(Boolean)).size;
   const volumeLabel=sourceView==="authors"?"ARTIKEL":"KONTEN";
+  async function setMediaPartner(publisher:string,isPartner:boolean){
+    setPartnerSaving(publisher);setPartnerError(null);
+    try{
+      const response=await fetch('/api/media-partners',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({publisher,isPartner})});
+      const payload=await response.json();
+      if(!response.ok)throw new Error(payload.error||'Status partner gagal disimpan.');
+      await live.refresh();
+    }catch(error){setPartnerError(error instanceof Error?error.message:'Status partner gagal disimpan.');}
+    finally{setPartnerSaving(null);}
+  }
   return <>
     <div className="source-top source-intel-top"><div><span className="source-eyebrow">SOURCE INTELLIGENCE</span><h2>Sumber Data</h2><p>Direktori aktual dari konten crawler dan konfigurasi target ClueFy.</p></div>{section==="directory"&&<button className="primary" onClick={()=>void live.refresh()}>↻ Refresh data live</button>}</div>
     <div className="source-workspace-tabs" role="tablist" aria-label="Pengelolaan sumber data">
@@ -221,13 +233,15 @@ function GovernmentDataSources(){
     </div>
     <section className="card source-directory">
       <div className="source-directory-head"><div><h3>{sourceView==="social"?"Akun Social Media":sourceView==="media"?"Media terpantau":"Direktori penulis"}</h3><p>{sourceView==="authors"?"Hanya byline dari artikel media; akun social media dipisahkan ke direktorinya sendiri.":sourceView==="social"?"Akun dikelompokkan berdasarkan handle atau nama profil pada kanal sosial.":"Negara dan asal ditampilkan jika tersedia pada metadata sumber."}</p></div><div className="source-search">⌕ <input value={sourceQuery} onChange={event=>setSourceQuery(event.target.value)} placeholder={`Cari ${sourceView==="authors"?"penulis":sourceView==="social"?"akun":"sumber"}...`} aria-label="Cari sumber data"/></div></div>
-      <div className={`source-list ${sourceView==="authors"?"authors":""}`}>
-        <div className="source-list-row source-list-head"><span>{sourceView==="authors"?"PENULIS":sourceView==="social"?"AKUN SOCIAL MEDIA":"SUMBER / MEDIA"}</span><span>NEGARA</span><span>ASAL</span>{sourceView==="authors"&&<span>MEDIA</span>}<span>STATUS</span><span>{volumeLabel}</span>{sourceView!=="authors"&&<span>LAST SYNC</span>}</div>
+      {partnerError&&<div className="source-partner-error">{partnerError}</div>}
+      <div className={`source-list ${sourceView==="authors"?"authors":""} ${sourceView==="media"?"media-partners":""}`}>
+        <div className="source-list-row source-list-head"><span>{sourceView==="authors"?"PENULIS":sourceView==="social"?"AKUN SOCIAL MEDIA":"SUMBER / MEDIA"}</span><span>NEGARA</span><span>ASAL</span>{sourceView==="authors"&&<span>MEDIA</span>}{sourceView==="media"&&<span>PARTNER PEMDA</span>}<span>STATUS</span><span>{volumeLabel}</span>{sourceView!=="authors"&&<span>LAST SYNC</span>}</div>
         {filteredRows.map((item,index)=><div className="source-list-row source-list-item" key={`${item.name}-${index}`}>
           <span className="source-entity"><i className={`source-directory-avatar ${item.tone||""}`}>{item.initial}</i><span><b>{item.name}</b><small>{item.detail||'Metadata kanal belum tersedia'}</small></span></span>
           <span className="source-country"><i>{countryFlag(item.country)}</i><b>{item.country}</b></span>
           <span className="source-origin">{item.origin}</span>
           {sourceView==="authors"&&<span className="source-media-count">{item.media}</span>}
+          {sourceView==="media"&&<label className={`source-partner-toggle ${item.partner?'checked':''}`}><input type="checkbox" checked={item.partner} disabled={partnerSaving===item.name} onChange={event=>void setMediaPartner(item.name,event.target.checked)}/><i>{partnerSaving===item.name?'…':item.partner?'✓':''}</i><span>{item.partner?'Partner':'Non-partner'}</span></label>}
           <span><em className="connection">● {item.status}</em></span>
           <span className="source-volume"><b>{item.volume.toLocaleString('id-ID')}</b><small>{sourceView==="authors"?"artikel":"konten"}</small></span>
           {sourceView!=="authors"&&<span className="source-sync">{item.sync}</span>}
