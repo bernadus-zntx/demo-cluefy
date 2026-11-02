@@ -75,6 +75,7 @@ function itemFromRow(row: CrawlRow, partnerPublishers: Set<string>) {
     validationStatus: text(raw.validationStatus) ?? "unreviewed",
     validatedBy: text(raw.validatedBy),
     validatedAt: text(raw.validatedAt),
+    viewedAt: text(raw.viewedAt),
     classificationHistory: Array.isArray(raw.classificationHistory) ? raw.classificationHistory : [],
     sourceGroup: text(raw.sourceGroup),
     evidenceType: text(raw.evidenceType),

@@ -8,7 +8,7 @@ export type LiveItem = {
   author:string|null; publisher:string|null; platform:string|null; language:string|null; country:string|null; location:string|null;
   publishedAt:string|null; capturedAt:string; firstSeenAt:string; lastSeenAt:string; topic:string|null; sentiment:string|null; severity:string|null;
   village:string|null; actor:string|null; translation:string|null; sourceGroup:string|null; evidenceType:string|null; sourceNote:string|null;
-  validationStatus:string; validatedBy:string|null; validatedAt:string|null; classificationHistory:unknown[];
+  validationStatus:string; validatedBy:string|null; validatedAt:string|null; viewedAt:string|null; classificationHistory:unknown[];
   reach:number|null; engagement:number|null; mediaPartner:boolean;
   ai:{summary:string|null;finding:string|null;recommendation:string|null;emotion:string|null;confidence:number|null;entities:string[];provider:string|null;model:string|null;enrichedAt:string|null};
 };

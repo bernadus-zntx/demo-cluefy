@@ -89,3 +89,7 @@ npm run crawler:watch
 ```
 
 The ingestion API remains the deduplication authority. Repeated URLs update `last_seen_at`; changed content creates a revision instead of a second content row.
+
+### Umpan balik validasi
+
+Saat reviewer menandai konten tidak valid, alasan wajib diisi. Sistem menyimpan alasan dan URL yang telah dinormalisasi sebagai aturan validasi, lalu menghapus kontennya. Penerimaan crawler menyaring URL yang sama pada crawling berikutnya dan mengembalikan `action: "filtered"`; ini tidak dianggap error dan tidak memblokir seluruh penerbit atau artikel lain. Varian yang hanya berbeda parameter pelacakan diperlakukan sebagai URL yang sama. Alasan merupakan catatan review, bukan aturan kata kunci otomatis. Status valid dan sudah dilihat dipertahankan saat konten diperbarui oleh crawler.

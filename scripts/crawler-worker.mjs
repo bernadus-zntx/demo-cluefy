@@ -550,7 +550,7 @@ async function cycle() {
   const rules = [...(rulePayload.rules || [])].sort((a, b) => localePriority(a) - localePriority(b) || a.code.localeCompare(b.code));
   const runPayload = await api("/api/crawler/runs", { method: "POST", body: JSON.stringify({ rulesRequested: rules.length, metadata: { worker: "cluefy-google-news", started: new Date().toISOString() } }) });
   const runId = runPayload.run.id;
-  let received = 0, inserted = 0, duplicate = 0, revised = 0, aiEnriched = 0, aiBackfilled = 0;
+  let received = 0, inserted = 0, duplicate = 0, revised = 0, filtered = 0, aiEnriched = 0, aiBackfilled = 0;
   const errors = [], skipped = [], aiErrors = [];
   try {
     for (const rule of rules) {
@@ -588,6 +588,7 @@ async function cycle() {
           if (item.action === "inserted") inserted++;
           else if (item.action === "duplicate") duplicate++;
           else if (item.action === "revised") revised++;
+          else if (item.action === "filtered") filtered++;
           else errors.push(`${rule.code}: ${item.error || item.action}`);
         }
       } catch (error) { errors.push(error instanceof Error ? error.message : String(error)); }
@@ -609,7 +610,7 @@ async function cycle() {
     }
     const status = errors.length ? (received ? "partial" : "failed") : "completed";
     await api("/api/crawler/runs", { method: "PATCH", body: JSON.stringify({ id: runId, status, itemsReceived: received, itemsInserted: inserted, itemsDuplicate: duplicate, itemsRevised: revised, errorMessage: errors.join(" | ") || null }) });
-    console.log(JSON.stringify({ status, rules: rules.length, received, inserted, duplicate, revised, aiEnriched, aiBackfilled, aiErrors, skipped, errors }, null, 2));
+    console.log(JSON.stringify({ status, rules: rules.length, received, inserted, duplicate, revised, filtered, aiEnriched, aiBackfilled, aiErrors, skipped, errors }, null, 2));
   } catch (error) {
     await api("/api/crawler/runs", { method: "PATCH", body: JSON.stringify({ id: runId, status: "failed", itemsReceived: received, itemsInserted: inserted, itemsDuplicate: duplicate, itemsRevised: revised, errorMessage: error instanceof Error ? error.message : String(error) }) }).catch(() => {});
     throw error;

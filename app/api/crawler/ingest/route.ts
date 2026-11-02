@@ -38,8 +38,16 @@ export async function POST(request: NextRequest) {
     }
     try {
       const canonicalUrl = canonicalizeUrl(item.url);
+      const db = getSupabaseAdmin();
+      const { data: blocked, error: blockError } = await db.from("crawler_rules").select("code").eq("code", `INVALID-${sha256(canonicalUrl)}`).maybeSingle();
+      if (blockError) throw new Error("Filter validasi tidak dapat diperiksa; data tidak disimpan.");
+      if (blocked) { results.push({ url: item.url, action: "filtered", reason: "Ditandai tidak valid" }); continue; }
+      const { data: existing, error: existingError } = await db.from("crawl_items").select("raw_payload").eq("canonical_url_hash", sha256(canonicalUrl)).maybeSingle();
+      if (existingError) throw new Error("Status validasi tidak dapat diperiksa; data tidak disimpan.");
+      const previous = existing?.raw_payload && typeof existing.raw_payload === "object" ? existing.raw_payload as Record<string, unknown> : {};
+      const reviewed = Object.fromEntries(["viewedAt", "validationStatus", "validatedBy", "validatedAt"].filter(key => previous[key] != null).map(key => [key, previous[key]]));
       const normalizedContent = `${item.title}\n${item.author ?? ""}\n${item.body ?? item.excerpt ?? ""}`.replace(/\s+/g, " ").trim().toLowerCase();
-      const { data, error } = await getSupabaseAdmin().rpc("ingest_crawl_item", {
+      const { data, error } = await db.rpc("ingest_crawl_item", {
         p_rule_id: item.ruleId,
         p_source: item.source,
         p_external_id: item.externalId ?? null,
@@ -57,8 +65,18 @@ export async function POST(request: NextRequest) {
         p_country: item.country ?? null,
         p_location: item.location ?? null,
         p_published_at: item.publishedAt ?? null,
-        p_raw_payload: item.rawPayload ?? {},
+        p_raw_payload: { ...(item.rawPayload ?? {}), ...reviewed },
       });
+      if (!error && data && typeof data === "object" && "item_id" in data) {
+        const { data: blockedAfter, error: recheckError } = await db.from("crawler_rules").select("code").eq("code", `INVALID-${sha256(canonicalUrl)}`).maybeSingle();
+        if (recheckError) throw new Error("Filter validasi gagal diperiksa ulang.");
+        if (blockedAfter) {
+          const { error: deleteError } = await db.from("crawl_items").delete().eq("id", data.item_id);
+          if (deleteError) throw new Error("Data tidak valid gagal dikeluarkan.");
+          results.push({ url: item.url, action: "filtered", reason: "Ditandai tidak valid" });
+          continue;
+        }
+      }
       results.push(error ? { url: item.url, action: "error", error: error.message } : { url: item.url, ...(data as Record<string, unknown>) });
     } catch (error) {
       results.push({ url: item.url, action: "rejected", error: error instanceof Error ? error.message : "URL tidak valid." });
@@ -66,5 +84,6 @@ export async function POST(request: NextRequest) {
   }
 
   const failed = results.filter(result => result.action === "error" || result.action === "rejected").length;
-  return NextResponse.json({ accepted: results.length - failed, failed, results }, { status: failed === results.length ? 400 : 200 });
+  const filtered = results.filter(result => result.action === "filtered").length;
+  return NextResponse.json({ accepted: results.length - failed - filtered, filtered, failed, results }, { status: failed === results.length ? 400 : 200 });
 }
