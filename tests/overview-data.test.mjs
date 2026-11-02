@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readAllPages } from '../lib/paginated-query.ts';
 import { collectLivePages } from '../lib/live-pagination.ts';
-import { analyzeDistricts, countLocationSentiments, districtVillages, resolveDistrictLocation } from '../lib/district-analysis.ts';
+import { analyzeDistricts, countLocationSentiments, districtVillages, resolveDistrictLocation, dominantSentiments, topLocationTopics } from '../lib/district-analysis.ts';
 import { languageKey, summarizeLanguages } from '../lib/language-analysis.ts';
 import { buildDailyTrend, buildTrendForRange, conversationDate, defaultOverviewFilters, filterOverviewItems, inConversationPeriod, overviewWindow, previousOverviewWindow } from '../lib/conversation-trend.ts';
 
@@ -159,4 +159,27 @@ test('language concerns use actual topic and sentiment metadata, with aliases an
   assert.equal(languageKey('Bahasa Indonesia'), 'id');
   assert.equal(languages.reduce((sum, item) => sum + item.total, 0), rows.length);
   assert.deepEqual(summarizeLanguages([]), []);
+});
+
+test('district top three topics and village sentiment leaders use only classified, filtered rows and retain ties', () => {
+  const row = (village, topic, sentiment) => ({ location: 'Kuta Utara', village, topic, sentiment, severity: null });
+  const rows = [row('Canggu', 'Sampah', 'Negative'), row('Canggu', 'Sampah', 'Negative'), row('Canggu', 'Pariwisata', 'Positive'), row('Canggu', 'Layanan Publik', 'Positive'), row('Canggu', 'Layanan Publik', 'Neutral'), row('Dalung', 'Pariwisata', 'Positive'), row('Dalung', null, 'Negative'), row('Dalung', 'Belum diklasifikasi', 'Negative')];
+  const district = analyzeDistricts(rows).find(item => item.name === 'Kuta Utara');
+  assert.equal(district.topTopics.length, 3);
+  assert.deepEqual(district.topTopics.map(topic => [topic.name, topic.total]), [['Layanan Publik', 2], ['Pariwisata', 2], ['Sampah', 2]]);
+  const canggu = district.villages.find(item => item.name === 'Canggu');
+  assert.deepEqual(canggu.topBySentiment.negative, [{ name: 'Sampah', count: 2 }]);
+  assert.deepEqual(canggu.topBySentiment.positive, [{ name: 'Layanan Publik', count: 1 }, { name: 'Pariwisata', count: 1 }]);
+  assert.deepEqual(canggu.topBySentiment.neutral, [{ name: 'Layanan Publik', count: 1 }]);
+  const dalung = district.villages.find(item => item.name === 'Dalung');
+  assert.equal(dalung.negative, 2);
+  assert.deepEqual(dalung.topBySentiment.negative, []);
+  assert.deepEqual(topLocationTopics([]), []);
+});
+
+test('dominant sentiment compares the full volume and represents ties and unclassified data honestly', () => {
+  assert.deepEqual(dominantSentiments({ total: 10, positive: 2, neutral: 5, negative: 1, unknown: 2 }), [{ key: 'neutral', count: 5 }]);
+  assert.deepEqual(dominantSentiments({ total: 6, positive: 3, neutral: 0, negative: 3, unknown: 0 }), [{ key: 'positive', count: 3 }, { key: 'negative', count: 3 }]);
+  assert.deepEqual(dominantSentiments({ total: 4, positive: 0, neutral: 1, negative: 0, unknown: 3 }), [{ key: 'unknown', count: 3 }]);
+  assert.deepEqual(dominantSentiments({ total: 0, positive: 0, neutral: 0, negative: 0, unknown: 0 }), []);
 });

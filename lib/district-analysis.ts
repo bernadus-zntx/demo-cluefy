@@ -59,6 +59,29 @@ export function countLocationSentiments(items: { sentiment: string | null }[]): 
   return counts;
 }
 
+export function topLocationTopics(items: { topic: string | null; sentiment: string | null }[]) {
+  const topics = new Map<string, LocationCounts>();
+  for (const item of items) {
+    const name = item.topic?.trim();
+    if (!name || /^belum (diklasifikasi|dianalisis|terdeteksi)$/i.test(name)) continue;
+    const counts = topics.get(name) || { total: 0, positive: 0, neutral: 0, negative: 0, unknown: 0 };
+    counts.total++;
+    if (item.sentiment === 'Positive') counts.positive++;
+    else if (item.sentiment === 'Neutral') counts.neutral++;
+    else if (item.sentiment === 'Negative') counts.negative++;
+    else counts.unknown++;
+    topics.set(name, counts);
+  }
+  return [...topics].map(([name, counts]) => ({ name, ...counts }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'id'));
+}
+
+export function dominantSentiments(counts: LocationCounts) {
+  const entries = (['positive', 'neutral', 'negative', 'unknown'] as const).map(key => ({ key, count: counts[key] }));
+  const max = Math.max(...entries.map(item => item.count));
+  return max ? entries.filter(item => item.count === max) : [];
+}
+
 export function analyzeDistricts<T extends Analyzed>(items: T[]) {
   const located = items.map(item => ({ item, ...resolveDistrictLocation(item) }));
   return Object.entries(districtVillages).map(([name, villages]) => {
@@ -66,10 +89,17 @@ export function analyzeDistricts<T extends Analyzed>(items: T[]) {
     const subset = rows.map(row => row.item);
     const topics = new Map<string, number>();
     for (const item of subset) if (item.topic) topics.set(item.topic, (topics.get(item.topic) || 0) + 1);
-    const villageRows = [...villages, 'Belum terpetakan'].map(village => ({
-      name: village, ...countLocationSentiments(rows.filter(row => (row.village || 'Belum terpetakan') === village).map(row => row.item)),
-    })).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'id'));
-    return { name, ...countLocationSentiments(subset), items: subset, villages: villageRows,
+    const villageRows = [...villages, 'Belum terpetakan'].map(village => {
+      const villageItems = rows.filter(row => (row.village || 'Belum terpetakan') === village).map(row => row.item);
+      const villageTopics = topLocationTopics(villageItems);
+      const topBySentiment = Object.fromEntries((['positive', 'neutral', 'negative'] as const).map(sentiment => {
+        const ranked = villageTopics.filter(topic => topic[sentiment] > 0).sort((a, b) => b[sentiment] - a[sentiment] || b.total - a.total || a.name.localeCompare(b.name, 'id'));
+        const count = ranked[0]?.[sentiment] || 0;
+        return [sentiment, count ? ranked.filter(topic => topic[sentiment] === count).map(topic => ({ name: topic.name, count })) : []];
+      })) as Record<'positive' | 'neutral' | 'negative', { name: string; count: number }[]>;
+      return { name: village, ...countLocationSentiments(villageItems), topBySentiment };
+    }).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'id'));
+    return { name, ...countLocationSentiments(subset), items: subset, villages: villageRows, topTopics: topLocationTopics(subset).slice(0, 3),
       needs: subset.filter(item => item.sentiment === 'Negative' || ['High', 'Critical'].includes(item.severity || '')).length,
       mainTopic: [...topics].sort((a, b) => b[1] - a[1])[0]?.[0] || 'Belum terdeteksi',
     };

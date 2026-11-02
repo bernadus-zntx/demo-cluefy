@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { summarizeLanguages } from '../../lib/language-analysis';
+import { dominantSentiments } from '../../lib/district-analysis';
 import { buildTrendForRange } from '../../lib/conversation-trend';
 import { LiveDonut, LiveTrendChart } from './LiveOverviewCharts';
 import type { LiveItem } from './LiveIntelligence';
@@ -24,9 +25,16 @@ export function LiveLanguageAnalysis({ items, periodLabel, from, to, now }: { it
     <div className={styles.banner}><span>LANGUAGE INTELLIGENCE</span><h2>Bahasa &amp; Isu Percakapan</h2><p>Bandingkan apa yang dibahas di setiap bahasa, temukan isu yang mendapat sentimen negatif, lalu telusuri percakapannya.</p></div>
     <div className="kpis"><div className="kpi"><small>Total percakapan</small><strong>{format(items.length)}</strong><p>{periodLabel} · sesuai filter</p></div><div className="kpi"><small>Bahasa terdeteksi</small><strong>{format(known.length)}</strong><p>berdasarkan metadata sumber</p></div><div className="kpi"><small>Bahasa belum diketahui</small><strong>{format(unknown)}</strong><p>tetap dihitung dalam total</p></div><div className="kpi"><small>Percakapan negatif</small><strong>{format(negative)}</strong><p>semua bahasa · sesuai filter</p></div></div>
     <div className={styles.layout}><section className="card"><h3>Bahasa Terpantau</h3><p className={styles.caption}>Pilih bahasa untuk melihat isu dan sentimennya.</p>
-      <div className={styles.languageList}>{languages.map(language => <button type="button" key={language.key} className={`${styles.languageRow} ${language.key === selected?.key ? styles.active : ''}`} aria-pressed={language.key === selected?.key} onClick={() => { setSelectedKey(language.key); setSelectedTopic(null); }}>
-        <span><b>{language.label}</b><small>{format(language.total)} percakapan · {percent(language.total, items.length)}</small></span><span className={styles.languageStats}><b>{language.negative} negatif</b><small>{language.concerns[0]?.name || 'Topik belum diklasifikasi'}</small></span><i>→</i>
-      </button>)}</div>{!languages.length && <p className={styles.empty}>Belum ada percakapan sesuai filter.</p>}
+      <div className={styles.languageList}>{languages.map(language => {
+        const dominant = dominantSentiments(language);
+        const label = { positive: 'positif', neutral: 'netral', negative: 'negatif', unknown: 'belum dianalisis' };
+        const dominantKey = dominant.length === 1 ? dominant[0].key : null;
+        const ranked = [...language.concerns].sort((a, b) => dominantKey ? b[dominantKey] - a[dominantKey] || b.total - a.total || a.name.localeCompare(b.name, 'id') : b.total - a.total || a.name.localeCompare(b.name, 'id'));
+        const topTopic = ranked[0] && (!dominantKey || ranked[0][dominantKey] > 0) ? ranked[0].name : 'Topik belum tersedia';
+        return <button type="button" key={language.key} className={`${styles.languageRow} ${language.key === selected?.key ? styles.active : ''}`} aria-pressed={language.key === selected?.key} onClick={() => { setSelectedKey(language.key); setSelectedTopic(null); }}>
+          <span><b>{language.label}</b><small>{format(language.total)} percakapan · {percent(language.total, items.length)}</small></span><span className={styles.languageStats}><b className={dominantKey ? styles[dominantKey] : styles.mixed}>{dominant.length ? `${percent(dominant[0].count, language.total)} ${dominant.map(item => label[item.key]).join(' / ')}` : 'Belum ada data'}</b><small>{topTopic}</small></span><i>→</i>
+        </button>;
+      })}</div>{!languages.length && <p className={styles.empty}>Belum ada percakapan sesuai filter.</p>}
     </section>
     <section className={`card ${styles.details}`} aria-live="polite">{selected ? <>
       <div className={styles.detailHead}><div><span>ANALISIS BAHASA</span><h3>{selected.label}</h3><p>{format(selected.total)} percakapan · {periodLabel}</p></div><strong>{percent(selected.total, items.length)}</strong></div>
