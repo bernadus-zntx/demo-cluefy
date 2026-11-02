@@ -1,0 +1,14 @@
+node_modules
+.next
+.vinext
+.git
+.github
+.env*
+!.env.example
+coverage
+dist
+out
+work
+outputs
+*.log
+*.tsbuildinfo

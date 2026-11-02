@@ -1,0 +1,89 @@
+name: cluefy
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cluefy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run node scripts/docker-setup.mjs and pass --env-file .env.docker}
+    volumes:
+      - cluefy-db:/var/lib/postgresql/data
+      - ./docker/db/00-roles.sql:/docker-entrypoint-initdb.d/00-roles.sql:ro
+      - ./supabase/migrations/202610130001_crawler_ingestion.sql:/docker-entrypoint-initdb.d/10-crawler-ingestion.sql:ro
+      - ./supabase/migrations/202610130002_foreign_media_rules.sql:/docker-entrypoint-initdb.d/11-foreign-media-rules.sql:ro
+      - ./supabase/migrations/202610140001_source_directory_backfill.sql:/docker-entrypoint-initdb.d/12-source-directory-backfill.sql:ro
+      - ./supabase/migrations/202610140002_direct_aif_article.sql:/docker-entrypoint-initdb.d/13-direct-aif-article.sql:ro
+      - ./supabase/migrations/202610150001_reddit_public_feeds.sql:/docker-entrypoint-initdb.d/14-reddit-public-feeds.sql:ro
+      - ./supabase/migrations/202610150002_facebook_public_pages.sql:/docker-entrypoint-initdb.d/15-facebook-public-pages.sql:ro
+      - ./docker/db/99-grants.sql:/docker-entrypoint-initdb.d/99-grants.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d cluefy -h 127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  rest:
+    image: postgrest/postgrest:v16.5
+    restart: unless-stopped
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/cluefy
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${PGRST_JWT_SECRET:?Run node scripts/docker-setup.mjs and pass --env-file .env.docker}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    image: cluefy-app:local
+    build: .
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: http://frontend
+      SUPABASE_SECRET_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?Run node scripts/docker-setup.mjs and pass --env-file .env.docker}
+      CRAWLER_API_KEY: ${CRAWLER_API_KEY:?Run node scripts/docker-setup.mjs and pass --env-file .env.docker}
+    depends_on:
+      - rest
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  frontend:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CLUEFY_PORT:-3107}:80"
+    volumes:
+      - ./docker/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  crawler:
+    image: cluefy-app:local
+    restart: unless-stopped
+    command: ["node", "scripts/crawler-worker.mjs"]
+    environment:
+      CLUEFY_API_BASE_URL: http://frontend
+      CRAWLER_API_KEY: ${CRAWLER_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-luna}
+      AI_ENRICH_MAX_ITEMS: ${AI_ENRICH_MAX_ITEMS:-25}
+      CRAWLER_SINCE: ${CRAWLER_SINCE:-2026-10-01T00:00:00+08:00}
+    depends_on:
+      frontend:
+        condition: service_healthy
+
+volumes:
+  cluefy-db:

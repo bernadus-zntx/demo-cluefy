@@ -11,6 +11,10 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Run with Docker
+
+The repository includes a Docker Compose stack for PostgreSQL, the backend API, the scheduled crawler, and the frontend gateway. Run `node scripts/docker-setup.mjs`, then `docker compose --env-file .env.docker up --build -d`. Open [http://localhost:3107](http://localhost:3107). See [the Docker guide](docs/docker.md) for the architecture, credentials, data migration boundary, and operations.
+
 ## Deploy to Vercel
 
 Pushes to `main` deploy the linked `cluefy-dashboard` project to Vercel through `.github/workflows/deploy-production.yml`.

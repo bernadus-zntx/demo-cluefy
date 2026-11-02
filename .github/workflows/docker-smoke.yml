@@ -1,0 +1,42 @@
+name: Docker smoke test
+
+on:
+  push:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - compose.yaml
+      - docker/**
+      - scripts/docker-setup.mjs
+      - supabase/migrations/**
+      - .github/workflows/docker-smoke.yml
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate local-only credentials
+        run: node scripts/docker-setup.mjs
+      - name: Validate Compose
+        run: docker compose --env-file .env.docker config --quiet
+      - name: Start database, backend, and frontend
+        run: docker compose --env-file .env.docker up --build -d db rest backend frontend
+      - name: Verify live API and seeded rules
+        run: |
+          for attempt in $(seq 1 45); do
+            if node -e "fetch('http://127.0.0.1:3107/api/intelligence/live').then(async r => {const data=await r.json(); process.exit(r.ok && data.configured === true && data.rules.length > 0 ? 0 : 1)}).catch(() => process.exit(1))"; then
+              exit 0
+            fi
+            sleep 4
+          done
+          docker compose --env-file .env.docker logs db rest backend frontend
+          exit 1
+      - name: Stop containers
+        if: always()
+        run: docker compose --env-file .env.docker down
