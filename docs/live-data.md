@@ -4,7 +4,9 @@
 
 Pages use a descending UUID cursor and a fixed `first_seen_at` cutoff, so records inserted during a refresh do not shift page offsets. New records become visible on the next refresh. `LiveIntelligenceProvider` collects all pages before replacing the visible dataset and retains the previous dataset if any request fails. It sorts the collected items by publication/capture time. The crawler worker follows the same pagination contract for translation and enrichment backlogs.
 
-Overview uses calendar dates in Asia/Makassar (WITA). The selected period and topic/sentiment/country filters feed the conversation total, trend, sentiment distribution, rankings, district view, and demographics. Case/Finding operational queues retain their separate scope. Trend tooltips include zero-volume dates and unclassified sentiment. Ranges longer than 90 days use weekly buckets; ranges longer than 730 days use 30-day buckets, retaining the full selected total.
+Overview uses calendar dates in Asia/Makassar (WITA). The selected period and topic/sentiment/country filters feed the conversation total, trend, sentiment distribution, rankings, district view, and language analysis. Case/Finding operational queues retain their separate scope. Trend tooltips include zero-volume dates and unclassified sentiment. Ranges longer than 90 days use weekly buckets; ranges longer than 730 days use 30-day buckets, retaining the full selected total.
+
+The Bahasa & Isu view groups actual language metadata, including an explicit unknown-language bucket. A selected language shows its sentiment and topic counts, prioritizing topics with negative conversations; clicking a topic shows recent source links. Missing or unclassified topics are excluded from the concern ranking. Language does not imply nationality. The shared Overview filters apply throughout. Trend tooltips appear on the plotted points and are placed above the plot.
 
 Run `npm run test:overview` for pagination, date-boundary, filter-intersection, and aggregation regressions.
 

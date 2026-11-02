@@ -9,7 +9,7 @@
 .hitArea:focus-visible{stroke:#285d6c;stroke-width:1;stroke-dasharray:3 3}
 .xLabels{display:flex;justify-content:space-between;gap:4px;color:#849997;font-size:9px;padding-top:6px}
 .tooltip{position:absolute;z-index:8;background:#fff;color:#24444b;border:1px solid #cbdcdd;border-radius:10px;box-shadow:0 8px 24px #193d4626;padding:12px;pointer-events:none;font-size:10px;line-height:1.4;text-align:left}
-.trendTooltip{top:0;width:224px;max-width:100%}
+.trendTooltip{bottom:calc(100% + 10px);width:224px;max-width:100%}
 .tooltip time{display:block;font-size:10px;font-weight:750}
 .timezone{display:block;color:#71868a;font-size:8px;margin-top:2px}
 .tooltipTotal{display:flex;align-items:center;justify-content:space-between;gap:7px;margin:8px 0}

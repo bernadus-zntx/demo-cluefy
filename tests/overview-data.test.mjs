@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readAllPages } from '../lib/paginated-query.ts';
 import { collectLivePages } from '../lib/live-pagination.ts';
 import { analyzeDistricts, countLocationSentiments, districtVillages, resolveDistrictLocation } from '../lib/district-analysis.ts';
+import { languageKey, summarizeLanguages } from '../lib/language-analysis.ts';
 import { buildDailyTrend, buildTrendForRange, conversationDate, defaultOverviewFilters, filterOverviewItems, inConversationPeriod, overviewWindow, previousOverviewWindow } from '../lib/conversation-trend.ts';
 
 const now = Date.parse('2026-11-02T10:00:00+08:00');
@@ -138,4 +139,24 @@ test('district drilldown uses exactly the same intersected Overview filters', ()
   const north = analyzeDistricts(filtered).find(district => district.name === 'Kuta Utara');
   assert.equal(north.total, 1);
   assert.equal(north.villages.find(village => village.name === 'Canggu').negative, 1);
+});
+
+test('language concerns use actual topic and sentiment metadata, with aliases and unknowns retained', () => {
+  const rows = [
+    { language: 'EN', topic: 'Transportasi', sentiment: 'Negative' },
+    { language: 'English', topic: 'Transportasi', sentiment: 'Negative' },
+    { language: 'en-US', topic: 'Pariwisata', sentiment: 'Positive' },
+    { language: 'en', topic: 'Belum diklasifikasi', sentiment: null },
+    { language: 'Bahasa Indonesia', topic: 'Sampah', sentiment: 'Neutral' },
+    { language: null, topic: null, sentiment: 'Negative' },
+  ];
+  const languages = summarizeLanguages(rows);
+  const english = languages.find(item => item.key === 'en');
+  assert.equal(english.total, 4);
+  assert.deepEqual([english.positive, english.neutral, english.negative, english.unknown], [1, 0, 2, 1]);
+  assert.deepEqual(english.concerns.map(item => [item.name, item.total, item.negative]), [['Transportasi', 2, 2], ['Pariwisata', 1, 0]]);
+  assert.equal(languages.find(item => item.key === 'unknown').total, 1);
+  assert.equal(languageKey('Bahasa Indonesia'), 'id');
+  assert.equal(languages.reduce((sum, item) => sum + item.total, 0), rows.length);
+  assert.deepEqual(summarizeLanguages([]), []);
 });

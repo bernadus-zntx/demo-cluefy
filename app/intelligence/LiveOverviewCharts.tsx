@@ -43,14 +43,12 @@ export function LiveTrendChart({ data, compact = false, label = 'Tren percakapan
         {[30, 75, 120, 165].map(value => <line key={value} x1="0" x2="700" y1={value} y2={value} stroke="#e9eeea" />)}
         {data.length > 1 && <polygon points={`5,165 ${points} 695,165`} fill={`url(#${id}-area)`} />}
         <polyline points={points} fill="none" stroke="#167f7a" strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />
-        {data.map((day, index) => day.total > 0 && <circle key={day.date} cx={x(index)} cy={y(day.total)} r="3.5" fill="#fff" stroke="#167f7a" strokeWidth="2" />)}
+        {data.map((day, index) => <circle key={day.date} cx={x(index)} cy={y(day.total)} r="3.5" fill="#fff" stroke="#167f7a" strokeWidth="2" pointerEvents="none" />)}
         {active && activeIndex !== null && <g pointerEvents="none"><line x1={x(activeIndex)} x2={x(activeIndex)} y1="0" y2="165" stroke="#73a8ad" strokeDasharray="4 4" /><circle cx={x(activeIndex)} cy={y(active.total)} r="6" fill="#167f7a" stroke="#fff" strokeWidth="2" /></g>}
-        {data.map((day, index) => <rect key={day.date} className={styles.hitArea}
-          x={index === 0 ? 0 : (x(index - 1) + x(index)) / 2}
-          width={data.length === 1 ? 700 : index === 0 || index === data.length - 1 ? 5 + 345 / Math.max(1, data.length - 1) : 690 / Math.max(1, data.length - 1)}
-          y="0" height="175" fill="transparent" tabIndex={0} role="button"
+        {data.map((day, index) => <circle key={day.date} className={styles.hitArea}
+          cx={x(index)} cy={y(day.total)} r="7" fill="transparent" tabIndex={0} role="button"
           aria-label={describe(day)} aria-describedby={activeIndex === index ? `${id}-tooltip` : undefined}
-          onPointerEnter={() => setActiveIndex(index)} onPointerMove={() => setActiveIndex(index)}
+          onPointerEnter={() => setActiveIndex(index)} onPointerLeave={() => setActiveIndex(null)}
           onClick={() => setActiveIndex(index)} onFocus={() => setActiveIndex(index)} onBlur={() => setActiveIndex(null)}
           onKeyDown={event => { if (event.key === 'Escape') setActiveIndex(null); if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setActiveIndex(index); } }} />)}
       </svg>
