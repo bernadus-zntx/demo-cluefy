@@ -37,7 +37,7 @@ services:
         condition: service_healthy
 
   backend:
-    image: cluefy-app:local
+    image: ${CLUEFY_APP_IMAGE:-cluefy-app:local}
     build: .
     restart: unless-stopped
     environment:
@@ -71,7 +71,7 @@ services:
       retries: 12
 
   crawler:
-    image: cluefy-app:local
+    image: ${CLUEFY_APP_IMAGE:-cluefy-app:local}
     restart: unless-stopped
     command: ["node", "scripts/crawler-worker.mjs"]
     environment:

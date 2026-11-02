@@ -24,6 +24,20 @@ Buka <http://localhost:3107>. Jika ingin mengubah port, edit `CLUEFY_PORT` di `.
 
 Database baru menjalankan semua file di `supabase/migrations/` pada saat volume pertama dibuat. Migrasi tidak dijalankan ulang pada volume yang sudah ada. Database Docker mulai kosong dan **tidak menyalin data dari Supabase cloud**; crawler akan mengisi data baru dari aturan sumber yang sudah di-seed. Jika tim membutuhkan salinan data lama, migrasikan dengan prosedur backup/restore terpisah sebelum memakai stack ini.
 
+## Membagikan image ke tim
+
+Setiap perubahan di branch `main` menjalankan smoke test Docker. Jika lulus, GitHub Actions menerbitkan image aplikasi untuk `backend` dan `crawler` ke `ghcr.io/bernadus-zntx/demo-cluefy:main` untuk `linux/amd64` dan `linux/arm64`. Tag `sha-<commit>` juga diterbitkan agar tim bisa memakai versi yang tetap. PostgreSQL, PostgREST, dan Nginx menggunakan image resmi/public yang sudah tercantum di Compose.
+
+Tim tetap perlu clone repo karena Compose memakai file migrasi database dan konfigurasi Nginx dari repo. Dari direktori proyek di mesin tim:
+
+```bash
+node scripts/docker-setup.mjs
+CLUEFY_APP_IMAGE=ghcr.io/bernadus-zntx/demo-cluefy:main \
+  docker compose --env-file .env.docker up --pull always --no-build -d
+```
+
+Dashboard tersedia di <http://localhost:3107>. Ulangi perintah `up` untuk mengambil image terbaru. Untuk mengunci satu rilis, ganti `:main` dengan tag `:sha-<commit>` yang terlihat di [GitHub Packages](https://github.com/bernadus-zntx/demo-cluefy/pkgs/container/demo-cluefy). Jika package GHCR masih private, pemilik package harus memberi tim akses baca; tiap anggota login ke `ghcr.io` memakai GitHub personal access token (classic) dengan scope `read:packages` sebelum menjalankan Compose. Jangan bagikan `.env.docker` atau token ke tim; tiap mesin membuat kredensialnya sendiri.
+
 ## Operasi
 
 ```bash

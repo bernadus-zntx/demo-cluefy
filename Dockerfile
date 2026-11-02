@@ -15,6 +15,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
+LABEL org.opencontainers.image.source="https://github.com/bernadus-zntx/demo-cluefy"
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.next ./.next
