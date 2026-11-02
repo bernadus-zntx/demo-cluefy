@@ -21,6 +21,13 @@ type LiveResponse = LivePage<LiveItem> & { configured: boolean; generatedAt?: st
 const Context=createContext<LiveStore|null>(null);
 const overviewCacheKey='cluefy-overview-v1';
 const overviewCacheMaxAge=2*60_000;
+function cacheOverview(items:LiveItem[],at:string|null){
+  if(!at)return;
+  try{
+    const compact=items.map(item=>({...item,url:item.canonicalUrl||item.url,canonicalUrl:'',externalId:null,body:null,excerpt:null,translation:null,sourceNote:null,actor:null,classificationHistory:[],ai:{summary:null,finding:null,recommendation:null,emotion:null,confidence:null,entities:[],provider:null,model:null,enrichedAt:null}}));
+    sessionStorage.setItem(overviewCacheKey,JSON.stringify({savedAt:Date.now(),at,items:compact}));
+  }catch{/* cache is optional */}
+}
 
 export function LiveIntelligenceProvider({children}:{children:ReactNode}){
   const [state,setState]=useState<Omit<LiveStore,'refresh'>>({configured:false,loading:true,error:null,generatedAt:null,items:[],overviewItems:null,overviewAt:null,overviewCached:false,rules:[],runs:[]});
@@ -48,13 +55,14 @@ export function LiveIntelligenceProvider({children}:{children:ReactNode}){
           overview.items.sort((a,b)=>Date.parse(b.publishedAt||b.capturedAt)-Date.parse(a.publishedAt||a.capturedAt)||b.id.localeCompare(a.id));
           const at=overview.generatedAt||null;
           setState(current=>current.items.length?current:{...current,configured:true,overviewItems:overview.items,overviewAt:at,overviewCached:false});
-          try{sessionStorage.setItem(overviewCacheKey,JSON.stringify({savedAt:Date.now(),at,items:overview.items}));}catch{/* cache is optional */}
+          cacheOverview(overview.items,at);
         }
       } catch {/* Full data remains the fallback if the summary is unavailable. */}
       const payload=await collectPartitionedLivePages<LiveItem,LiveResponse>((cursor,snapshot,shard)=>read(cursor,snapshot,shard,false));
       if(!payload.configured)throw new Error('Sumber data belum terhubung.');
       payload.items.sort((a,b)=>Date.parse(b.publishedAt||b.capturedAt)-Date.parse(a.publishedAt||a.capturedAt)||b.id.localeCompare(a.id));
       hasFullData.current=true;
+      cacheOverview(payload.items,payload.generatedAt||null);
       setState({configured:Boolean(payload.configured),loading:false,error:null,generatedAt:payload.generatedAt||null,items:payload.items||[],overviewItems:null,overviewAt:null,overviewCached:false,rules:payload.rules||[],runs:payload.runs||[]});
     }catch(error){setState(current=>({...current,loading:false,error:error instanceof Error?error.message:'Data live gagal dimuat.'}));}
     finally{inFlight.current=null;}
