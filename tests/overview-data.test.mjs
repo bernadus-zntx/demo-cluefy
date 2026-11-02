@@ -228,3 +228,13 @@ test('dominant sentiment compares the full volume and represents ties and unclas
   assert.deepEqual(dominantSentiments({ total: 4, positive: 0, neutral: 1, negative: 0, unknown: 3 }), [{ key: 'unknown', count: 3 }]);
   assert.deepEqual(dominantSentiments({ total: 0, positive: 0, neutral: 0, negative: 0, unknown: 0 }), []);
 });
+
+test('regional issue filters intersect and retain mapped village and unknown records correctly', async () => {
+  const { filterRegionalRecords } = await import('../lib/regional-issues-filter.ts');
+  const base = { sourceType:'Media Online', media:'Media A', sentiment:'Negative', district:'Kuta Utara', village:'Canggu', severity:'High', text:'Sampah di pantai', author:'A', account:'Media A', topic:'Sampah' };
+  const records = [base, {...base, village:'Dalung'}, {...base, sentiment:'Positive'}, {...base, topic:'Pariwisata'}, {...base, district:'Belum terpetakan', village:'Belum terpetakan'}];
+  const filters = {source:'Semua sumber', sentiment:'Negative', district:'Kuta Utara', village:'Canggu', severity:'Semua severity', query:'pantai', topic:'Sampah'};
+  assert.deepEqual(filterRegionalRecords(records, filters), [base]);
+  assert.equal(filterRegionalRecords(records, {...filters,village:'Semua desa/kelurahan',topic:'Semua isu'}).length, 3);
+  assert.equal(filterRegionalRecords(records, {...filters,district:'Belum terpetakan',village:'Belum terpetakan'}).length, 1);
+});
