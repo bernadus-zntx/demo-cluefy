@@ -49,8 +49,14 @@ export function LiveIntelligenceProvider({children}:{children:ReactNode}){
         if(!response.ok)throw new Error(page.error||'Data live gagal dimuat.');
         return page;
       };
+      let serverSnapshot:string|undefined;
+      try{
+        const response=await fetch('/api/intelligence/live?clock=1',{cache:'no-store'});
+        const clock=await response.json();
+        if(response.ok&&typeof clock.snapshot==='string'&&Number.isFinite(Date.parse(clock.snapshot)))serverSnapshot=clock.snapshot;
+      }catch{/* Fall back to obtaining the snapshot from the first page. */}
       if(!hasFullData.current)try {
-        const overview=await collectPartitionedLivePages<LiveItem,LiveResponse>((cursor,snapshot,shard)=>read(cursor,snapshot,shard,true));
+        const overview=await collectPartitionedLivePages<LiveItem,LiveResponse>((cursor,snapshot,shard)=>read(cursor,snapshot,shard,true),serverSnapshot);
         if(overview.configured){
           overview.items.sort((a,b)=>Date.parse(b.publishedAt||b.capturedAt)-Date.parse(a.publishedAt||a.capturedAt)||b.id.localeCompare(a.id));
           const at=overview.generatedAt||null;
@@ -58,7 +64,7 @@ export function LiveIntelligenceProvider({children}:{children:ReactNode}){
           cacheOverview(overview.items,at);
         }
       } catch {/* Full data remains the fallback if the summary is unavailable. */}
-      const payload=await collectPartitionedLivePages<LiveItem,LiveResponse>((cursor,snapshot,shard)=>read(cursor,snapshot,shard,false));
+      const payload=await collectPartitionedLivePages<LiveItem,LiveResponse>((cursor,snapshot,shard)=>read(cursor,snapshot,shard,false),serverSnapshot);
       if(!payload.configured)throw new Error('Sumber data belum terhubung.');
       payload.items.sort((a,b)=>Date.parse(b.publishedAt||b.capturedAt)-Date.parse(a.publishedAt||a.capturedAt)||b.id.localeCompare(a.id));
       hasFullData.current=true;

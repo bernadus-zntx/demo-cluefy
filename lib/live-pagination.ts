@@ -24,11 +24,9 @@ export async function collectLivePages<T extends { id: string }, P extends LiveP
 // All partitions must complete before a new dataset can replace the previous one.
 export async function collectPartitionedLivePages<T extends { id: string }, P extends LivePage<T>>(
   readPage: (cursor: string | null, snapshot: string | null, shard: string) => Promise<P>,
+  serverSnapshot?: string,
 ): Promise<P> {
-  const first = await readPage(null, null, '0');
-  if (!first.pagination) return first;
-  const snapshot = first.pagination.snapshot;
-  async function finish(shard: string, page: P) {
+  async function finish(shard: string, page: P, snapshot: string) {
     const rows = [...page.items];
     const cursors = new Set<string>();
     while (page.pagination?.nextCursor) {
@@ -42,9 +40,20 @@ export async function collectPartitionedLivePages<T extends { id: string }, P ex
     if (page.pagination?.snapshot !== snapshot) throw new Error('Snapshot data live berubah. Silakan coba lagi.');
     return rows;
   }
+  if (serverSnapshot) {
+    const shards = await Promise.all(['0', '1', '2', '3'].map(async shard => {
+      const page = await readPage(null, serverSnapshot, shard);
+      if (!page.pagination && shard === '0') return { page, rows: page.items };
+      return { page, rows: await finish(shard, page, serverSnapshot) };
+    }));
+    return { ...shards[0].page, items: [...new Map(shards.flatMap(part => part.rows).map(item => [item.id, item])).values()] };
+  }
+  const first = await readPage(null, null, '0');
+  if (!first.pagination) return first;
+  const snapshot = first.pagination.snapshot;
   const groups = await Promise.all([
-    finish('0', first),
-    ...['1', '2', '3'].map(async shard => finish(shard, await readPage(null, snapshot, shard))),
+    finish('0', first, snapshot),
+    ...['1', '2', '3'].map(async shard => finish(shard, await readPage(null, snapshot, shard), snapshot)),
   ]);
   return { ...first, items: [...new Map(groups.flat().map(item => [item.id, item])).values()] };
 }

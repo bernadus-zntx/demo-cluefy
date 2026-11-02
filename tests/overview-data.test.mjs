@@ -78,6 +78,17 @@ test('partition errors and inconsistent snapshots never produce an incomplete va
   await assert.rejects(collectPartitionedLivePages(async (cursor, snapshot, shard) => ({ items: [], pagination: { snapshot: 's1', nextCursor: shard === '0' ? 'loop' : null } })), /berulang/);
 });
 
+test('server snapshot starts all four first pages concurrently and rejects incomplete partitions', async () => {
+  let active=0,peak=0;
+  const result=await collectPartitionedLivePages(async (cursor,snapshot,shard)=>{
+    assert.equal(snapshot,'s1');active++;peak=Math.max(peak,active);
+    await new Promise(resolve=>setTimeout(resolve,3));active--;
+    return {items:[{id:shard}],rules:shard==='0'?['rules']:[],pagination:{snapshot:'s1',nextCursor:null}};
+  },'s1');
+  assert.equal(peak,4);assert.equal(result.items.length,4);assert.deepEqual(result.rules,['rules']);
+  await assert.rejects(collectPartitionedLivePages(async (cursor,snapshot,shard)=>({items:[],pagination:{snapshot:shard==='3'?'wrong':'s1',nextCursor:null}}),'s1'),/Snapshot/);
+});
+
 test('28 calendar days use Bali midnight and share identical totals and daily buckets', () => {
   const rows = [item('2026-10-06T00:00:00+08:00', 'Positive'), item('2026-10-05T23:59:59+08:00', 'Negative'), item('2026-11-01T16:30:00Z', 'Negative'), item('2026-11-02T09:00:00+08:00', 'Neutral'), item(null), item('invalid'), item('2026-11-03T01:00:00+08:00')];
   const current = rows.filter(row => inConversationPeriod(row, 28, 0, now));

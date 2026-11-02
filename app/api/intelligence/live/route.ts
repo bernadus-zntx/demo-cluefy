@@ -97,11 +97,12 @@ function itemFromRow(row: CrawlRow, partnerPublishers: Set<string>) {
 }
 
 export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  if (params.get("clock") === "1") return NextResponse.json({ snapshot: new Date().toISOString() }, { headers: { "Cache-Control": "private, no-store" } });
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ configured: false, items: [], rules: [], runs: [], generatedAt: new Date().toISOString() });
   }
 
-  const params = new URL(request.url).searchParams;
   const cursor = params.get("cursor");
   const shard = params.get("shard");
   const overview = params.get("overview") === "1" && shard !== null;
