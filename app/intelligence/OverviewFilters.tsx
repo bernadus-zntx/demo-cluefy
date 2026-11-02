@@ -6,7 +6,7 @@ import { defaultOverviewFilters, type OverviewFilters as Filters } from '../../l
 import styles from './overview-filters.module.css';
 
 const sentiments = [{ value: 'Positive', label: 'Positif' }, { value: 'Neutral', label: 'Netral' }, { value: 'Negative', label: 'Negatif' }, { value: 'unknown', label: 'Belum dianalisis' }];
-const flags: Record<string, string> = { Indonesia: '🇮🇩', Australia: '🇦🇺', Jepang: '🇯🇵', Jerman: '🇩🇪', Rusia: '🇷🇺', Ukraina: '🇺🇦', 'Amerika Serikat': '🇺🇸', 'Hong Kong': '🇭🇰', Inggris: '🇬🇧', Prancis: '🇫🇷' };
+const flags: Record<string, string> = { Indonesia: '🇮🇩', Australia: '🇦🇺', Jepang: '🇯🇵', Jerman: '🇩🇪', Rusia: '🇷🇺', Ukraina: '🇺🇦', 'Amerika Serikat': '🇺🇸', 'Hong Kong': '🇭🇰', Inggris: '🇬🇧', Prancis: '🇫🇷', Singapura: '🇸🇬', Malaysia: '🇲🇾', Belanda: '🇳🇱', Kanada: '🇨🇦', India: '🇮🇳', China: '🇨🇳' };
 
 export function OverviewFilterPanel({ value, onChange, topics, countries, periodLabel, count, valid, now }: {
   value: Filters; onChange: (value: Filters) => void; topics: string[]; countries: string[];
