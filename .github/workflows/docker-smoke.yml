@@ -20,6 +20,8 @@ jobs:
           node-version: '22'
       - name: Generate local-only credentials
         run: node scripts/docker-setup.mjs
+      - name: Verify overview counts and filters
+        run: node --test tests/overview-data.test.mjs
       - name: Validate Compose
         run: docker compose --env-file .env.docker config --quiet
       - name: Validate sales engineer bundle

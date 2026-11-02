@@ -12,6 +12,7 @@
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "test:crawler": "node scripts/smoke-crawler.mjs",
+    "test:overview": "node --test tests/overview-data.test.mjs",
     "crawler:once": "node --env-file=.env.local scripts/crawler-worker.mjs --once",
     "crawler:watch": "node --env-file=.env.local scripts/crawler-worker.mjs",
     "crawler:seed": "node --env-file=.env.local scripts/seed-source-rules.mjs",

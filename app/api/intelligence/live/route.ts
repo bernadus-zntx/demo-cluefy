@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin, isSupabaseConfigured } from "../../../../lib/supabase-admin";
+import { readAllPages } from "../../../../lib/paginated-query";
 
 export const dynamic = "force-dynamic";
 
@@ -95,27 +96,39 @@ function itemFromRow(row: CrawlRow, partnerPublishers: Set<string>) {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ configured: false, items: [], rules: [], runs: [], generatedAt: new Date().toISOString() });
   }
 
+  const params = new URL(request.url).searchParams;
+  const cursor = params.get("cursor");
+  const snapshot = params.get("snapshot") || new Date().toISOString();
+  if ((cursor && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cursor)) || !Number.isFinite(Date.parse(snapshot))) {
+    return NextResponse.json({ error: "Cursor atau waktu snapshot tidak valid." }, { status: 400 });
+  }
+  const pageSize = 250;
   const supabase = getSupabaseAdmin();
-  const [itemsResult, rulesResult, runsResult] = await Promise.all([
-    supabase.from("crawl_items").select("id,source,external_id,original_url,canonical_url,title,excerpt,body,author,publisher,platform,language,country,location,published_at,captured_at,first_seen_at,last_seen_at,raw_payload").order("published_at", { ascending: false, nullsFirst: false }).limit(1000),
-    supabase.from("crawler_rules").select("id,code,rule_type,value,source,scope,status,last_run_at,result_count,updated_at").order("code"),
-    supabase.from("crawl_runs").select("id,status,started_at,completed_at,rules_requested,items_received,items_inserted,items_duplicate,items_revised,error_message,created_at").order("created_at", { ascending: false }).limit(20),
+  let itemsQuery = supabase.from("crawl_items").select("id,source,external_id,original_url,canonical_url,title,excerpt,body,author,publisher,platform,language,country,location,published_at,captured_at,first_seen_at,last_seen_at,raw_payload").lte("first_seen_at", snapshot).order("id", { ascending: false }).limit(pageSize + 1);
+  if (cursor) itemsQuery = itemsQuery.lt("id", cursor);
+  const [itemsResult, rulesResult, runsResult, partnersResult] = await Promise.all([
+    itemsQuery,
+    cursor ? Promise.resolve({ data: [], error: null }) : readAllPages((from, to) => supabase.from("crawler_rules").select("id,code,rule_type,value,source,scope,status,last_run_at,result_count,updated_at").order("code").range(from, to)),
+    cursor ? Promise.resolve({ data: [], error: null }) : supabase.from("crawl_runs").select("id,status,started_at,completed_at,rules_requested,items_received,items_inserted,items_duplicate,items_revised,error_message,created_at").order("created_at", { ascending: false }).limit(20),
+    readAllPages<{ publisher: string | null; source: string }>((from, to) => supabase.from("crawl_items").select("publisher,source").eq("raw_payload->>mediaPartner", "true").order("id").range(from, to)),
   ]);
 
-  const error = itemsResult.error ?? rulesResult.error ?? runsResult.error;
+  const error = itemsResult.error ?? rulesResult.error ?? runsResult.error ?? partnersResult.error;
   if (error) return NextResponse.json({ configured: true, error: error.message }, { status: 500 });
 
-  const relevantRows = (itemsResult.data ?? []).filter(row => isRelevantItem(row as CrawlRow)) as CrawlRow[];
-  const partnerPublishers = new Set(relevantRows.filter(row => row.raw_payload?.mediaPartner === true).map(row => publisherKey(row.publisher ?? row.source)).filter(Boolean));
+  const rows = (itemsResult.data ?? []).slice(0, pageSize) as CrawlRow[];
+  const relevantRows = rows.filter(isRelevantItem);
+  const partnerPublishers = new Set((partnersResult.data ?? []).map(row => publisherKey(row.publisher ?? row.source)).filter(Boolean));
 
   return NextResponse.json({
     configured: true,
-    generatedAt: new Date().toISOString(),
+    generatedAt: snapshot,
+    pagination: { nextCursor: (itemsResult.data?.length ?? 0) > pageSize ? rows.at(-1)!.id : null, snapshot },
     items: relevantRows.map(row => itemFromRow(row, partnerPublishers)),
     rules: rulesResult.data ?? [],
     runs: runsResult.data ?? [],

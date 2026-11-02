@@ -1,0 +1,37 @@
+.trend{position:relative;padding:14px 4px 0 38px;min-width:0}
+.yLabels{position:absolute;left:0;top:37px;height:131px;display:flex;flex-direction:column;justify-content:space-between;color:#849997;font-size:9px}
+.plot{position:relative;min-width:0}
+.line{display:block;width:100%;height:170px;overflow:visible}
+.hitArea{cursor:crosshair;outline:none}
+.hitArea:focus-visible{stroke:#285d6c;stroke-width:1;stroke-dasharray:3 3}
+.xLabels{display:flex;justify-content:space-between;gap:4px;color:#849997;font-size:9px;padding-top:6px}
+.tooltip{position:absolute;z-index:8;background:#fff;color:#24444b;border:1px solid #cbdcdd;border-radius:10px;box-shadow:0 8px 24px #193d4626;padding:12px;pointer-events:none;font-size:10px;line-height:1.4;text-align:left}
+.trendTooltip{top:0;width:224px;max-width:100%}
+.tooltip time{display:block;font-size:10px;font-weight:750}
+.timezone{display:block;color:#71868a;font-size:8px;margin-top:2px}
+.tooltipTotal{display:flex;align-items:center;justify-content:space-between;gap:7px;margin:8px 0}
+.tooltipTotal strong{font-size:18px;line-height:1.1}
+.breakdown{border-top:1px solid #e6eeee;padding-top:5px}
+.breakdown>div{display:grid;grid-template-columns:7px 1fr auto 35px;gap:6px;align-items:center;padding:3px 0;font-size:9px}
+.breakdown i,.legend i{display:block;width:7px;height:7px;border-radius:50%}
+.breakdown small{color:#71868a;font-size:8px;text-align:right}
+.sentiment{display:flex;align-items:center;gap:20px;padding:18px 0;position:relative;min-width:0}
+.donutFrame{position:relative;width:145px;flex:0 0 145px;aspect-ratio:1}
+.donutSvg{display:block;width:100%;height:100%;overflow:visible}
+.slice{cursor:pointer;outline:none;transition:opacity .12s}
+.slice:focus-visible{stroke:#24444b;stroke-width:2}
+.donutCenter{position:absolute;inset:28%;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;pointer-events:none}
+.donutCenter b{font-size:20px;line-height:1.2}
+.donutCenter span{font-size:9px;color:#71868a;margin-top:4px;line-height:1.2}
+.donutTooltip{left:0;top:calc(100% + 8px);width:210px}
+.donutTooltip>small{font-size:9px;color:#71868a}
+.legend{flex:1;min-width:0}
+.legend button{appearance:none;display:grid;grid-template-columns:7px 1fr auto;gap:8px;align-items:center;width:100%;border:0;border-bottom:1px solid #edf0ed;border-radius:4px;padding:8px 3px;background:transparent;color:#24444b;text-align:left;font-size:10px}
+.legend button:hover,.legend .selected{background:#eff6f4}
+.legend button:focus-visible{outline:2px solid #285d6c;outline-offset:2px}
+.legend button>div{text-align:right}
+.legend b,.legend small{display:block}
+.legend b{font-size:11px}
+.legend small{font-size:8px;color:#71868a;margin-top:2px}
+@media(max-width:1100px){.sentiment{gap:10px;flex-wrap:wrap}.donutFrame{margin:auto}.legend{flex-basis:150px}}
+@media(max-width:480px){.trend{padding-left:27px}.xLabels{font-size:8px}.trendTooltip{width:210px}.sentiment{flex-wrap:nowrap}.donutFrame{width:125px;flex-basis:125px}.legend{flex-basis:0}}

@@ -530,7 +530,20 @@ async function crawlRule(rule, existingTranslations) {
 }
 
 async function cycle() {
-  const livePayload = await api("/api/intelligence/live").catch(() => ({ items: [] }));
+  const livePayload = await (async () => {
+    const first = await api("/api/intelligence/live");
+    const items = new Map((first.items || []).map(item => [item.id, item]));
+    const seen = new Set();
+    let page = first;
+    while (page.pagination?.nextCursor) {
+      const { nextCursor, snapshot } = page.pagination;
+      if (seen.has(nextCursor)) throw new Error("Live data cursor repeated");
+      seen.add(nextCursor);
+      page = await api(`/api/intelligence/live?${new URLSearchParams({ cursor: nextCursor, snapshot })}`);
+      for (const item of page.items || []) items.set(item.id, item);
+    }
+    return { ...first, items: [...items.values()].sort((a, b) => Date.parse(b.publishedAt || b.capturedAt) - Date.parse(a.publishedAt || a.capturedAt)) };
+  })().catch(() => ({ items: [] }));
   const existingTranslations = new Map((livePayload.items || []).flatMap(item => item.externalId && item.translation ? [[item.externalId, item.translation]] : []));
   const rulePayload = await api("/api/crawler/rules", { headers: { Authorization: `Bearer ${apiKey}` } });
   const localePriority = rule => ({ Internasional: 0, Indonesia: 1, "Amerika Serikat": 3, Rusia: 4, Ukraina: 5 }[feedProfile(rule).country] ?? 2);

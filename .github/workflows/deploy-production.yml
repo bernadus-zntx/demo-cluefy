@@ -55,6 +55,9 @@ jobs:
       - name: Verify production build
         run: npm run build
 
+      - name: Verify overview counts and filters
+        run: npm run test:overview
+
       - name: Deploy production
         id: deploy
         run: |
