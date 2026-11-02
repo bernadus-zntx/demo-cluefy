@@ -104,11 +104,12 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const cursor = params.get("cursor");
   const shard = params.get("shard");
+  const overview = params.get("overview") === "1" && shard !== null;
   const snapshot = params.get("snapshot") || new Date().toISOString();
   if ((cursor && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cursor)) || (shard !== null && !/^[0-3]$/.test(shard)) || !Number.isFinite(Date.parse(snapshot))) {
     return NextResponse.json({ error: "Cursor atau waktu snapshot tidak valid." }, { status: 400 });
   }
-  const pageSize = shard === null ? 250 : 400;
+  const pageSize = shard === null ? 250 : overview ? 900 : 400;
   const supabase = getSupabaseAdmin();
   let itemsQuery = supabase.from("crawl_items").select("id,source,external_id,original_url,canonical_url,title,excerpt,body,author,publisher,platform,language,country,location,published_at,captured_at,first_seen_at,last_seen_at,raw_payload").lte("first_seen_at", snapshot).order("id", { ascending: false }).limit(pageSize + 1);
   if (shard !== null) {
@@ -118,12 +119,12 @@ export async function GET(request: Request) {
     if (index < 3) itemsQuery = itemsQuery.lt("id", `${boundaries[index + 1]}0000000-0000-0000-0000-000000000000`);
   }
   if (cursor) itemsQuery = itemsQuery.lt("id", cursor);
-  const includeMetadata = !cursor && (shard === null || shard === '0');
+  const includeMetadata = !overview && !cursor && (shard === null || shard === '0');
   const [itemsResult, rulesResult, runsResult, partnersResult] = await Promise.all([
     itemsQuery,
     includeMetadata ? readAllPages((from, to) => supabase.from("crawler_rules").select("id,code,rule_type,value,source,scope,status,last_run_at,result_count,updated_at").order("code").range(from, to)) : Promise.resolve({ data: [], error: null }),
     includeMetadata ? supabase.from("crawl_runs").select("id,status,started_at,completed_at,rules_requested,items_received,items_inserted,items_duplicate,items_revised,error_message,created_at").order("created_at", { ascending: false }).limit(20) : Promise.resolve({ data: [], error: null }),
-    readAllPages<{ publisher: string | null; source: string }>((from, to) => supabase.from("crawl_items").select("publisher,source").eq("raw_payload->>mediaPartner", "true").order("id").range(from, to)),
+    overview ? Promise.resolve({ data: [], error: null }) : readAllPages<{ publisher: string | null; source: string }>((from, to) => supabase.from("crawl_items").select("publisher,source").eq("raw_payload->>mediaPartner", "true").order("id").range(from, to)),
   ]);
 
   const error = itemsResult.error ?? rulesResult.error ?? runsResult.error ?? partnersResult.error;
@@ -137,7 +138,10 @@ export async function GET(request: Request) {
     configured: true,
     generatedAt: snapshot,
     pagination: { nextCursor: (itemsResult.data?.length ?? 0) > pageSize ? rows.at(-1)!.id : null, snapshot },
-    items: relevantRows.map(row => itemFromRow(row, partnerPublishers)),
+    items: relevantRows.map(row => {
+      const item = itemFromRow(row, partnerPublishers);
+      return overview ? { ...item, url: item.canonicalUrl || item.url, canonicalUrl: null, externalId: null, body: null, excerpt: null, translation: null, sourceNote: null, actor: null, classificationHistory: [], ai: { summary: null, finding: null, recommendation: null, emotion: null, confidence: null, entities: [], provider: null, model: null, enrichedAt: null } } : item;
+    }),
     rules: rulesResult.data ?? [],
     runs: runsResult.data ?? [],
   }, { headers: { "Cache-Control": "private, no-store" } });

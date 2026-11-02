@@ -9,6 +9,13 @@ import { buildDailyTrend, buildTrendForRange, conversationDate, defaultOverviewF
 const now = Date.parse('2026-11-02T10:00:00+08:00');
 const item = (publishedAt, sentiment = null, topic = 'Sampah', country = 'Indonesia') => ({ publishedAt, capturedAt: '2026-11-02T01:00:00Z', sentiment, topic, country });
 
+test('Overview defaults to all time and still excludes future or invalid dates', () => {
+  const filters = defaultOverviewFilters(now);
+  assert.equal(filters.period, 'all');
+  const rows = [item('2025-01-01T01:00:00+08:00'), item('2026-11-02T09:00:00+08:00'), item('2026-11-03T01:00:00+08:00'), item('invalid')];
+  assert.equal(filterOverviewItems(rows, filters, overviewWindow(filters, rows, now), now).length, 2);
+});
+
 test('Supabase range reader goes beyond 1,000 records, including an exact page boundary', async () => {
   for (const total of [0, 1000, 2126]) {
     const rows = Array.from({ length: total }, (_, id) => ({ id }));

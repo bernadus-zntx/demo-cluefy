@@ -61,7 +61,7 @@ const labelDate = (date: string) => new Intl.DateTimeFormat('id-ID', { day: 'num
 
 export function defaultOverviewFilters(now = Date.now()): OverviewFilters {
   const today = conversationDate(now);
-  return { period: '28', topic: '', sentiment: '', country: '', from: shift(today, -27), to: today };
+  return { period: 'all', topic: '', sentiment: '', country: '', from: shift(today, -27), to: today };
 }
 
 export function overviewWindow(filters: OverviewFilters, items: ConversationTime[], now = Date.now()): OverviewWindow {

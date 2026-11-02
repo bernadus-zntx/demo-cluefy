@@ -14,7 +14,7 @@ export function OverviewFilterPanel({ value, onChange, topics, countries, period
 }) {
   const [expanded, setExpanded] = useState(false);
   const id = useId();
-  const activeCount = Number(value.period !== '28') + Number(Boolean(value.topic)) + Number(Boolean(value.sentiment)) + Number(Boolean(value.country));
+  const activeCount = Number(value.period !== 'all') + Number(Boolean(value.topic)) + Number(Boolean(value.sentiment)) + Number(Boolean(value.country));
   const field = <K extends keyof Filters>(key: K, next: Filters[K]) => onChange({ ...value, [key]: next });
   const selectedSentiment = sentiments.find(item => item.value === value.sentiment)?.label;
   return <section className={styles.root} aria-label="Filter percakapan Overview">
