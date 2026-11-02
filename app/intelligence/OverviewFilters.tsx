@@ -37,7 +37,7 @@ export function OverviewFilterPanel({ value, onChange, topics, countries, period
       </div>
       {value.period === 'custom' && <div className={styles.dates}><label>Dari tanggal<input type="date" value={value.from} max={conversationDate(now)} onChange={event => field('from', event.target.value)} /></label><label>Sampai tanggal<input type="date" value={value.to} max={conversationDate(now)} onChange={event => field('to', event.target.value)} /></label></div>}
       {!valid && <p role="alert" className={styles.error}>Isi kedua tanggal; tanggal akhir harus sesudah atau sama dengan tanggal awal dan tidak melebihi hari ini.</p>}
-      <p className={styles.hint}>Waktu Bali (WITA). Filter mengikuti percakapan, grafik, topik, kecamatan, dan demografi. Ringkasan operasional Case dan Finding memakai antrean aktif.</p>
+      <p className={styles.hint}>Waktu Bali (WITA). Filter mengikuti percakapan, grafik, topik, kecamatan, dan bahasa. Ringkasan operasional Case dan Finding memakai antrean aktif.</p>
     </div>
   </section>;
 }

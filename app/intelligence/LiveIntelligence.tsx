@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { collectLivePages, type LivePage } from '../../lib/live-pagination';
+import { collectPartitionedLivePages, type LivePage } from '../../lib/live-pagination';
 
 export type LiveItem = {
   id:string; externalId:string|null; source:string; url:string; canonicalUrl:string; title:string; excerpt:string|null; body:string|null;
@@ -28,8 +28,9 @@ export function LiveIntelligenceProvider({children}:{children:ReactNode}){
     inFlight.current=(async()=>{
     setState(current=>({...current,loading:true,error:null}));
     try{
-      const payload=await collectLivePages<LiveItem,LiveResponse>(async(cursor,snapshot)=>{
+      const payload=await collectPartitionedLivePages<LiveItem,LiveResponse>(async(cursor,snapshot,shard)=>{
         const params=new URLSearchParams();
+        params.set('shard',shard);
         if(cursor)params.set('cursor',cursor);
         if(snapshot)params.set('snapshot',snapshot);
         const response=await fetch(`/api/intelligence/live${params.size?`?${params}`:''}`,{cache:'no-store'});

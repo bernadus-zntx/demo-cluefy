@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readAllPages } from '../lib/paginated-query.ts';
-import { collectLivePages } from '../lib/live-pagination.ts';
+import { collectLivePages, collectPartitionedLivePages } from '../lib/live-pagination.ts';
 import { analyzeDistricts, countLocationSentiments, districtVillages, resolveDistrictLocation, dominantSentiments, topLocationTopics } from '../lib/district-analysis.ts';
 import { languageKey, summarizeLanguages } from '../lib/language-analysis.ts';
 import { buildDailyTrend, buildTrendForRange, conversationDate, defaultOverviewFilters, filterOverviewItems, inConversationPeriod, overviewWindow, previousOverviewWindow } from '../lib/conversation-trend.ts';
@@ -42,6 +42,33 @@ test('filtered-out pages do not end pagination and cursor loops are rejected', a
   assert.equal(result.items.length, 1);
   await assert.rejects(collectLivePages(async () => ({ items: [], pagination: { snapshot: 'now', nextCursor: 'repeated' } })), /berulang/);
   await assert.rejects(collectLivePages(async cursor => { if (cursor) throw new Error('page failed'); return { items: [{ id: 'first' }], pagination: { snapshot: 'now', nextCursor: 'next' } }; }), /page failed/);
+});
+
+test('parallel UUID partitions preserve one snapshot, all rows, and first-page metadata', async () => {
+  const snapshot = '2026-11-02T02:00:00Z';
+  const data = Array.from({ length: 4 }, (_, shard) => Array.from({ length: 550 }, (_, index) => ({ id: `${shard}-${index}` })));
+  let active = 0, peak = 0;
+  const result = await collectPartitionedLivePages(async (cursor, snap, shard) => {
+    assert.equal(snap, shard === '0' && !cursor ? null : snapshot);
+    active++; peak = Math.max(peak, active);
+    await new Promise(resolve => setTimeout(resolve, 2));
+    active--;
+    const offset = Number(cursor || 0);
+    return { items: data[Number(shard)].slice(offset, offset + 400), rules: shard === '0' && !cursor ? ['rules'] : [], pagination: { snapshot, nextCursor: offset + 400 < 550 ? String(offset + 400) : null } };
+  });
+  assert.equal(result.items.length, 2200);
+  assert.equal(new Set(result.items.map(row => row.id)).size, 2200);
+  assert.deepEqual(result.rules, ['rules']);
+  assert.ok(peak >= 3, `expected parallel reads, peak was ${peak}`);
+});
+
+test('partition errors and inconsistent snapshots never produce an incomplete valid dataset', async () => {
+  await assert.rejects(collectPartitionedLivePages(async (cursor, snapshot, shard) => {
+    if (shard === '2') throw new Error('partition failed');
+    return { items: [{ id: shard }], pagination: { snapshot: 's1', nextCursor: null } };
+  }), /partition failed/);
+  await assert.rejects(collectPartitionedLivePages(async (cursor, snapshot, shard) => ({ items: [], pagination: { snapshot: shard === '2' ? 's2' : 's1', nextCursor: null } })), /Snapshot/);
+  await assert.rejects(collectPartitionedLivePages(async (cursor, snapshot, shard) => ({ items: [], pagination: { snapshot: 's1', nextCursor: shard === '0' ? 'loop' : null } })), /berulang/);
 });
 
 test('28 calendar days use Bali midnight and share identical totals and daily buckets', () => {
