@@ -238,3 +238,12 @@ test('regional issue filters intersect and retain mapped village and unknown rec
   assert.equal(filterRegionalRecords(records, {...filters,village:'Semua desa/kelurahan',topic:'Semua isu'}).length, 3);
   assert.equal(filterRegionalRecords(records, {...filters,district:'Belum terpetakan',village:'Belum terpetakan'}).length, 1);
 });
+
+test('comment summaries preserve unavailable and unclassified comments and rank captured sentiments', async () => {
+  const {parsePublicComments,summarizeComments}=await import('../lib/comment-analysis.ts');
+  assert.equal(parsePublicComments(null),null);
+  const comments=parsePublicComments([{id:'a',text:'Baik',sentiment:'Positive',likes:2},{id:'b',text:'Bagus',sentiment:'Positive',likes:10},{id:'c',text:'Buruk',sentiment:'Negative'},{id:'d',text:'Belum jelas'},{text:''}]);
+  const summary=summarizeComments(comments);
+  assert.deepEqual([summary.total,summary.positive,summary.neutral,summary.negative,summary.unknown],[4,2,0,1,1]);
+  assert.deepEqual(summary.positiveTop.map(item=>item.id),['b','a']);
+});

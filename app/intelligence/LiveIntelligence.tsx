@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { PublicComment } from '../../lib/comment-analysis';
 import { collectPartitionedLivePages, type LivePage } from '../../lib/live-pagination';
 
 export type LiveItem = {
@@ -8,6 +9,7 @@ export type LiveItem = {
   author:string|null; publisher:string|null; platform:string|null; language:string|null; country:string|null; location:string|null;
   publishedAt:string|null; capturedAt:string; firstSeenAt:string; lastSeenAt:string; topic:string|null; sentiment:string|null; severity:string|null;
   village:string|null; actor:string|null; translation:string|null; sourceGroup:string|null; evidenceType:string|null; sourceNote:string|null;
+  comments:PublicComment[]|null;
   validationStatus:string; validatedBy:string|null; validatedAt:string|null; viewedAt:string|null; classificationHistory:unknown[];
   reach:number|null; engagement:number|null; mediaPartner:boolean;
   ai:{summary:string|null;finding:string|null;recommendation:string|null;emotion:string|null;confidence:number|null;entities:string[];provider:string|null;model:string|null;enrichedAt:string|null};
@@ -24,7 +26,7 @@ const overviewCacheMaxAge=2*60_000;
 function cacheOverview(items:LiveItem[],at:string|null){
   if(!at)return;
   try{
-    const compact=items.map(item=>({...item,url:item.canonicalUrl||item.url,canonicalUrl:'',externalId:null,body:null,excerpt:null,translation:null,sourceNote:null,actor:null,classificationHistory:[],ai:{summary:null,finding:null,recommendation:null,emotion:null,confidence:null,entities:[],provider:null,model:null,enrichedAt:null}}));
+    const compact=items.map(item=>({...item,url:item.canonicalUrl||item.url,canonicalUrl:'',externalId:null,comments:null,body:null,excerpt:null,translation:null,sourceNote:null,actor:null,classificationHistory:[],ai:{summary:null,finding:null,recommendation:null,emotion:null,confidence:null,entities:[],provider:null,model:null,enrichedAt:null}}));
     sessionStorage.setItem(overviewCacheKey,JSON.stringify({savedAt:Date.now(),at,items:compact}));
   }catch{/* cache is optional */}
 }

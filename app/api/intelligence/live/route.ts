@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin, isSupabaseConfigured } from "../../../../lib/supabase-admin";
 import { readAllPages } from "../../../../lib/paginated-query";
+import { parsePublicComments } from "../../../../lib/comment-analysis";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,7 @@ function itemFromRow(row: CrawlRow, partnerPublishers: Set<string>) {
     validationStatus: text(raw.validationStatus) ?? "unreviewed",
     validatedBy: text(raw.validatedBy),
     validatedAt: text(raw.validatedAt),
+    comments: parsePublicComments(raw.comments),
     viewedAt: text(raw.viewedAt),
     classificationHistory: Array.isArray(raw.classificationHistory) ? raw.classificationHistory : [],
     sourceGroup: text(raw.sourceGroup),
@@ -142,7 +144,7 @@ export async function GET(request: Request) {
     pagination: { nextCursor: (itemsResult.data?.length ?? 0) > pageSize ? rows.at(-1)!.id : null, snapshot },
     items: relevantRows.map(row => {
       const item = itemFromRow(row, partnerPublishers);
-      return overview ? { ...item, url: item.canonicalUrl || item.url, canonicalUrl: null, externalId: null, body: null, excerpt: null, translation: null, sourceNote: null, actor: null, classificationHistory: [], ai: { summary: null, finding: null, recommendation: null, emotion: null, confidence: null, entities: [], provider: null, model: null, enrichedAt: null } } : item;
+      return overview ? { ...item, url: item.canonicalUrl || item.url, canonicalUrl: null, externalId: null, comments: null, body: null, excerpt: null, translation: null, sourceNote: null, actor: null, classificationHistory: [], ai: { summary: null, finding: null, recommendation: null, emotion: null, confidence: null, entities: [], provider: null, model: null, enrichedAt: null } } : item;
     }),
     rules: rulesResult.data ?? [],
     runs: runsResult.data ?? [],

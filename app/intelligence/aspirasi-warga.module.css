@@ -18,3 +18,4 @@
 .contentTypeTabs{flex-direction:row!important;justify-content:flex-start!important}
 .contentScope{margin:-7px 0 14px;color:#71868a;font-size:10px;line-height:1.5}
 .advanced input{width:100%;height:34px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:0 8px;font-size:8px}.deleteConfirm label{display:block;margin-top:8px;color:#80514d;font-size:7px}.deleteConfirm textarea{display:block;width:100%;min-height:56px;margin-top:4px;padding:7px;border:1px solid #efc3bf;border-radius:6px;resize:vertical;font:inherit}
+.comments{margin-top:12px;padding:11px;border:1px solid var(--line);border-radius:8px;background:#f7faf9}.comments h3{margin:0 0 6px}.comments h4{margin:10px 0 5px}.comments p,.comments small{color:var(--muted);font-size:7.5px;line-height:1.5}.comments blockquote{margin:5px 0;padding:8px;border-left:2px solid var(--teal2);background:#fff;font-size:8px;line-height:1.5;overflow-wrap:anywhere}
