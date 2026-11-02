@@ -2,6 +2,9 @@
 .yLabels{position:absolute;left:0;top:37px;height:131px;display:flex;flex-direction:column;justify-content:space-between;color:#849997;font-size:9px}
 .plot{position:relative;min-width:0}
 .line{display:block;width:100%;height:170px;overflow:visible}
+.compact .line{height:100px}
+.compact .yLabels{top:28px;height:78px}
+.compact .xLabels{font-size:8px}
 .hitArea{cursor:crosshair;outline:none}
 .hitArea:focus-visible{stroke:#285d6c;stroke-width:1;stroke-dasharray:3 3}
 .xLabels{display:flex;justify-content:space-between;gap:4px;color:#849997;font-size:9px;padding-top:6px}

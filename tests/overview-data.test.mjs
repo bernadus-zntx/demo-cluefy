@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readAllPages } from '../lib/paginated-query.ts';
 import { collectLivePages } from '../lib/live-pagination.ts';
+import { analyzeDistricts, countLocationSentiments, districtVillages, resolveDistrictLocation } from '../lib/district-analysis.ts';
 import { buildDailyTrend, buildTrendForRange, conversationDate, defaultOverviewFilters, filterOverviewItems, inConversationPeriod, overviewWindow, previousOverviewWindow } from '../lib/conversation-trend.ts';
 
 const now = Date.parse('2026-11-02T10:00:00+08:00');
@@ -86,4 +87,55 @@ test('long-range grouping retains every record and the selected end boundary', (
   assert.equal(trend.at(-1).endDate, conversationDate(now));
   assert.equal(trend.reduce((sum, bucket) => sum + bucket.total, 0), 3);
   assert.ok(trend.length < 100);
+});
+
+test('district mapping resolves official villages, longest names, and explicit districts without guessing generic locations', () => {
+  assert.equal(Object.values(districtVillages).flat().length, 62);
+  for (const [district, villages] of Object.entries(districtVillages)) {
+    for (const village of villages) assert.deepEqual(resolveDistrictLocation({ location: district, village }), { district, village });
+  }
+  const locate = (location, village = null) => resolveDistrictLocation({ location, village });
+  assert.deepEqual(locate('Kerobokan Kaja'), { district: 'Kuta Utara', village: 'Kerobokan Kaja' });
+  assert.deepEqual(locate('Tanjung Benoa'), { district: 'Kuta Selatan', village: 'Tanjung Benoa' });
+  assert.deepEqual(locate('Bongkasa Pertiwi'), { district: 'Abiansemal', village: 'Bongkasa Pertiwi' });
+  assert.deepEqual(locate('Tumbakbayuh'), { district: 'Mengwi', village: 'Tumbak Bayuh' });
+  assert.deepEqual(locate('Kuta Utara'), { district: 'Kuta Utara', village: null });
+  assert.deepEqual(locate('Kuta Utara', 'Kuta Utara'), { district: 'Kuta Utara', village: null });
+  assert.deepEqual(locate('Kuta'), { district: 'Kuta', village: null });
+  assert.deepEqual(locate('Kuta Selatan', 'Canggu'), { district: 'Kuta Selatan', village: null });
+  assert.deepEqual(locate('Canggu dan Kuta'), { district: null, village: null });
+  assert.deepEqual(locate('Canggu dan Dalung'), { district: 'Kuta Utara', village: null });
+  assert.deepEqual(locate('Taman Mumbul'), { district: null, village: null });
+  assert.deepEqual(locate('Badung'), { district: null, village: null });
+});
+
+test('district and village sentiment totals reconcile, including unknown and zero-data villages', () => {
+  const row = (location, village, sentiment, severity = null) => ({ location, village, sentiment, severity, topic: 'Pariwisata' });
+  const rows = [row('Canggu', null, 'Positive'), row('Kuta Utara', 'Tibubeneng', 'Negative', 'High'), row('Kuta Utara', null, null), row('Kuta Utara', 'Canggu', 'unexpected'), row('Kuta Selatan', 'Canggu', 'Neutral'), row('Badung', null, 'Positive')];
+  const districts = analyzeDistricts(rows);
+  const north = districts.find(district => district.name === 'Kuta Utara');
+  assert.deepEqual(countLocationSentiments(north.items), { total: 4, positive: 1, neutral: 0, negative: 1, unknown: 2 });
+  assert.equal(north.needs, 1);
+  assert.equal(north.villages.find(village => village.name === 'Canggu').total, 2);
+  assert.equal(north.villages.find(village => village.name === 'Belum terpetakan').total, 1);
+  assert.equal(north.villages.find(village => village.name === 'Dalung').total, 0);
+  assert.equal(districts.reduce((sum, district) => sum + district.total, 0), 5);
+  for (const district of districts) {
+    for (const key of ['total', 'positive', 'neutral', 'negative', 'unknown']) assert.equal(district.villages.reduce((sum, village) => sum + village[key], 0), district[key]);
+    assert.equal(district.total, district.positive + district.neutral + district.negative + district.unknown);
+  }
+  assert.ok(analyzeDistricts([]).every(district => district.total === 0 && district.villages.every(village => village.total === 0)));
+});
+
+test('district drilldown uses exactly the same intersected Overview filters', () => {
+  const rows = [
+    { ...item('2026-11-01T01:00:00+08:00', 'Negative', 'Sampah', 'Rusia'), location: 'Canggu', village: null, severity: 'High' },
+    { ...item('2026-11-01T01:00:00+08:00', 'Positive', 'Sampah', 'Rusia'), location: 'Canggu', village: null, severity: null },
+    { ...item('2026-10-01T01:00:00+08:00', 'Negative', 'Sampah', 'Rusia'), location: 'Canggu', village: null, severity: null },
+  ];
+  const filters = { ...defaultOverviewFilters(now), period: '7', topic: 'Sampah', sentiment: 'Negative', country: 'Rusia' };
+  const filtered = filterOverviewItems(rows, filters, overviewWindow(filters, rows, now), now);
+  const north = analyzeDistricts(filtered).find(district => district.name === 'Kuta Utara');
+  assert.equal(north.total, 1);
+  assert.equal(north.villages.find(village => village.name === 'Canggu').negative, 1);
 });

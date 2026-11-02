@@ -24,7 +24,7 @@ function Breakdown({ counts, total }: { counts: SentimentCounts; total: number }
   </div>)}</div>;
 }
 
-export function LiveTrendChart({ data }: { data: DailyConversation[] }) {
+export function LiveTrendChart({ data, compact = false, label = 'Tren percakapan sesuai filter, waktu Bali' }: { data: DailyConversation[]; compact?: boolean; label?: string }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const id = useId();
   const active = activeIndex === null ? null : data[activeIndex];
@@ -35,10 +35,10 @@ export function LiveTrendChart({ data }: { data: DailyConversation[] }) {
   const describe = (day: DailyConversation) => `${bucketLabel(day)}: ${number(day.total)} percakapan; ${segments.map(segment => `${segment.label} ${number(day[segment.key])}`).join(', ')}`;
   const ticks = [...new Set([0, .25, .5, .75, 1].map(ratio => Math.round(ratio * (data.length - 1))))].filter(index => data[index]);
 
-  return <div className={styles.trend}>
+  return <div className={`${styles.trend} ${compact ? styles.compact : ''}`}>
     <div className={styles.yLabels}><span>{number(max)}</span><span>{number(Math.round(max / 2))}</span><span>0</span></div>
     <div className={styles.plot} onPointerLeave={() => setActiveIndex(null)}>
-      <svg className={styles.line} viewBox="0 0 700 175" preserveAspectRatio="none" role="group" aria-label="Tren percakapan sesuai filter, waktu Bali">
+      <svg className={styles.line} viewBox="0 0 700 175" preserveAspectRatio="none" role="group" aria-label={label}>
         <defs><linearGradient id={`${id}-area`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#24938c" stopOpacity=".24" /><stop offset="1" stopColor="#24938c" stopOpacity="0" /></linearGradient></defs>
         {[30, 75, 120, 165].map(value => <line key={value} x1="0" x2="700" y1={value} y2={value} stroke="#e9eeea" />)}
         {data.length > 1 && <polygon points={`5,165 ${points} 695,165`} fill={`url(#${id}-area)`} />}
