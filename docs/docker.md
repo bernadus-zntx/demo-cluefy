@@ -38,6 +38,8 @@ CLUEFY_APP_IMAGE=ghcr.io/bernadus-zntx/demo-cluefy:main \
 
 Dashboard tersedia di <http://localhost:3107>. Ulangi perintah `up` untuk mengambil image terbaru. Untuk mengunci satu rilis, ganti `:main` dengan tag `:sha-<commit>` yang terlihat di [GitHub Packages](https://github.com/bernadus-zntx/demo-cluefy/pkgs/container/demo-cluefy). Jika package GHCR masih private, pemilik package harus memberi tim akses baca; tiap anggota login ke `ghcr.io` memakai GitHub personal access token (classic) dengan scope `read:packages` sebelum menjalankan Compose. Jangan bagikan `.env.docker` atau token ke tim; tiap mesin membuat kredensialnya sendiri.
 
+Untuk tim sales engineer yang tidak perlu repo, jalankan `python3 scripts/package-docker-demo.py` lalu bagikan `dist/cluefy-docker-sales.zip`. Paket ini hanya berisi konfigurasi runtime dan tombol Mulai/Update untuk Mac serta Windows. Tombol Update menarik tag `:main` dan membuat ulang `backend` serta `crawler` tanpa menghapus volume database. Jika rilis mengubah migrasi SQL atau konfigurasi Compose/Nginx, buat dan kirim ZIP baru.
+
 ## Operasi
 
 ```bash

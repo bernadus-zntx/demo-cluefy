@@ -22,6 +22,14 @@ jobs:
         run: node scripts/docker-setup.mjs
       - name: Validate Compose
         run: docker compose --env-file .env.docker config --quiet
+      - name: Validate sales engineer bundle
+        run: |
+          python3 scripts/package-docker-demo.py
+          mkdir -p dist/sales-check
+          unzip -q dist/cluefy-docker-sales.zip -d dist/sales-check
+          docker compose --env-file "$GITHUB_WORKSPACE/.env.docker" \
+            -f dist/sales-check/cluefy-docker/compose.yaml config --quiet
+          bash -n dist/sales-check/cluefy-docker/*.command
       - name: Start database, backend, and frontend
         run: docker compose --env-file .env.docker up --build -d db rest backend frontend
       - name: Verify live API and seeded rules
