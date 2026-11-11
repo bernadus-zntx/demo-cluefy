@@ -25,11 +25,22 @@ async function load() {
 }
 button.addEventListener('click', load);
 document.querySelector('#search').addEventListener('input', render);
+const organization = document.querySelector('#organization');
+const role = document.querySelector('#role');
+organization.addEventListener('change', () => {
+  document.querySelector('#role-field').hidden = organization.value !== 'government';
+  document.querySelector('#email').value = organization.value === 'government' ? 'admin@badung.go.id' : organization.value === 'validation' ? 'validation@olx.co.id' : 'admin@cluebeauty.id';
+});
 document.querySelector('#login-form').addEventListener('submit', event => {
   event.preventDefault();
   // Simulation only. Never transmit or persist the entered email/password.
+  const workspace = organization.selectedOptions[0].textContent;
+  const selectedRole = organization.value === 'government' ? role.value : '';
+  document.querySelector('#workspace').textContent = [workspace, selectedRole].filter(Boolean).join(' · ');
   document.querySelector('#login-form').reset();
   document.querySelector('#demo-login').hidden = true;
   document.querySelector('#dashboard').hidden = false;
+  window.history.replaceState(null, '', '/sales');
+  document.title = 'Dashboard ClueFy Sales';
   void load();
 });

@@ -42,30 +42,30 @@ export function createSalesServer({ config = configuration(), fetcher = fetch, a
   }
   return http.createServer(async (req, res) => {
     const send = (status, data, type = 'application/json') => {
-      res.writeHead(status, { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" });
+      res.writeHead(status, { 'Content-Type': type.startsWith('image/') ? type : `${type}; charset=utf-8`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" });
       res.end(type === 'application/json' ? JSON.stringify(data) : data);
     };
     if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return send(405, { error: 'Sales hanya mendukung GET.' }); }
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/healthz') return send(200, { status: 'ok', mode: 'read-only', configured: Boolean(config) });
     if (url.pathname === '/api/items') {
-    let principal;
-    try { principal = await authenticate(req); } catch { return send(503, { error: 'Verifikasi session existing tidak tersedia.' }); }
-    if (!principal) return send(401, { error: 'Session app.cluefy.co yang terverifikasi diperlukan. Integrasi authentication belum tersedia.' });
-    if (principal.internalZntx !== true || !principal.userId || !principal.accessToken) return send(403, { error: 'Akses khusus internal ZNTX.' });
-    // Defense in depth only: signature, issuer, expiry and membership must be
-    // verified by the existing auth adapter; this check never authenticates JWTs.
-    let claims;
-    try { claims = JSON.parse(Buffer.from(principal.accessToken.split('.')[1], 'base64url').toString()); } catch { /* deny below */ }
-    if (!claims || claims.role !== 'authenticated' || claims.sub !== principal.userId || !Number.isFinite(claims.exp) || claims.exp * 1000 <= Date.now()) return send(403, { error: 'Token pengguna tidak valid untuk akses Sales.' });
+      let principal;
+      try { principal = await authenticate(req); } catch { return send(503, { error: 'Verifikasi session existing tidak tersedia.' }); }
+      if (!principal) return send(401, { error: 'Session app.cluefy.co yang terverifikasi diperlukan. Integrasi authentication belum tersedia.' });
+      if (principal.internalZntx !== true || !principal.userId || !principal.accessToken) return send(403, { error: 'Akses khusus internal ZNTX.' });
+      // Defense in depth only: signature, issuer, expiry and membership must be
+      // verified by the existing auth adapter; this check never authenticates JWTs.
+      let claims;
+      try { claims = JSON.parse(Buffer.from(principal.accessToken.split('.')[1], 'base64url').toString()); } catch { /* deny below */ }
+      if (!claims || claims.role !== 'authenticated' || claims.sub !== principal.userId || !Number.isFinite(claims.exp) || claims.exp * 1000 <= Date.now()) return send(403, { error: 'Token pengguna tidak valid untuk akses Sales.' });
       if (url.search) return send(400, { error: 'Parameter tidak didukung.' });
       if (!config) return send(503, { error: 'Koneksi live belum dikonfigurasi. Menunggu persetujuan.' });
       try { return send(200, await load(principal)); } catch { return send(502, { error: 'Data live tidak dapat dibaca. Periksa izin baca yang sudah ada dan konektivitas; jangan gunakan key admin.' }); }
     }
-    const assets = { '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+    const assets = { '/sales': ['index.html', 'text/html'], '/existing-login.css': ['existing-login.css', 'text/css'], '/cluefy-icon-exact.png': ['cluefy-icon-exact.png', 'image/png'], '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
     const asset = assets[url.pathname];
     if (!asset) return send(404, { error: 'Tidak ditemukan.' });
-    try { send(200, await readFile(new URL(`./public/${asset[0]}`, import.meta.url), 'utf8'), asset[1]); } catch { send(500, { error: 'Halaman tidak tersedia.' }); }
+    try { send(200, await readFile(new URL(`./public/${asset[0]}`, import.meta.url), asset[1].startsWith('image/') ? null : 'utf8'), asset[1]); } catch { send(500, { error: 'Halaman tidak tersedia.' }); }
   });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

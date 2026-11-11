@@ -4,6 +4,9 @@ on:
     paths:
       - 'sales/**'
       - '.github/workflows/sales-check.yml'
+      - 'app/page.tsx'
+      - 'app/globals.css'
+      - 'public/cluefy-icon-exact.png'
 permissions:
   contents: read
 jobs:
@@ -15,6 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node sales/sync-existing-login.mjs --check
       - run: node --test sales/tests/*.test.mjs
       - run: docker compose -f sales/compose.yaml config --quiet
       - run: docker build -t cluefy-sales:check sales

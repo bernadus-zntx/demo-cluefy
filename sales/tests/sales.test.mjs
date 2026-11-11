@@ -64,3 +64,16 @@ test('unconfigured and denied upstream do not fall back to anon/admin', async t 
   const denied = await serve(t, { config: configuration(base), authenticate: async () => principal, fetcher: async () => new Response('private', { status: 403 }) });
   const response = await fetch(denied + '/api/items'); assert.equal(response.status, 502); assert.ok(!(await response.text()).includes('private'));
 });
+test('existing login assets and Sales route retain fields and image MIME', async t => {
+  const origin = await serve(t, { config: null });
+  const response = await fetch(origin);
+  const html = await response.text();
+  for (const label of ['ORGANIZATION', 'ROLE (SIMULASI)', 'EMAIL ADDRESS', 'PASSWORD', 'Kabupaten Badung', 'ClueBeauty Indonesia', 'OLX Indonesia']) assert.ok(html.includes(label));
+  assert.ok(html.includes('login-visual'));
+  assert.ok(html.includes('existing-login.css'));
+  assert.ok(response.headers.get('content-security-policy').includes("img-src 'self'"));
+  assert.equal((await fetch(origin + '/sales')).status, 200);
+  const image = await fetch(origin + '/cluefy-icon-exact.png');
+  assert.equal(image.headers.get('content-type'), 'image/png');
+  assert.deepEqual([...new Uint8Array(await image.arrayBuffer()).slice(0, 8)], [137,80,78,71,13,10,26,10]);
+});

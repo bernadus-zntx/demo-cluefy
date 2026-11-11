@@ -39,3 +39,17 @@ Enam tes menggunakan loopback dan upstream tiruan, tanpa production/secrets. Doc
 7. Rollback hanya project Sales dengan `docker compose -p cluefy-sales -f /opt/cluefy-sales/compose.yaml down` (sertakan environment Sales bila diperlukan). Jangan prune, down -v, atau stop existing.
 
 Build context Docker hanya allowlist server/assets; tidak membawa secrets, worker, atau migration. Tidak ada deployment dilakukan. Base image belum dipin digest/discan. Tampilan demo tidak menyelesaikan persyaratan keamanan level database; jangan mengiklankan kandidat ini sebagai siap production.
+
+## Reuse halaman login existing (update)
+
+Login ringkas Sales sebelumnya telah diganti hasil ekstraksi markup `Login` dari `app/page.tsx`, CSS login/responsive/tokens dari `app/globals.css`, serta logo existing. Organization, Role (terlihat untuk government seperti existing), Email, Password, Remember me, dan Forgot password mempertahankan desain/perilaku demo existing. Tidak ada perubahan pada source app existing. Tidak ada screenshot lampiran yang dapat diakses dalam chat ini; referensi visual yang digunakan adalah source repository.
+
+`node sales/sync-existing-login.mjs` meregenerasi assets; `--check` memverifikasi assets tidak berbeda dari source existing. Generator gagal bila struktur source berubah agar perubahan direview, bukan diam-diam menghasilkan login berbeda. Build Docker memakai hasil generate yang diverifikasi CI, tanpa membawa source dashboard existing. Setelah submit, URL berpindah ke `/sales` dan workspace/role terpilih ditampilkan. Refresh menampilkan login demo lagi, sesuai state login existing yang tidak persisten. Organization/Role bukan otorisasi; Remember me/Forgot password tetap simulasi dan tidak menghasilkan session.
+
+### Solusi perubahan minimum — usulan, belum diimplementasikan
+
+Tetap gunakan form/desain ini. Ganti hanya submit handler simulasi dengan pemanggilan **Supabase Auth production yang sama**, jika memang sudah ada akun internal di layanan tersebut, lalu gunakan session user yang diverifikasi server untuk API Sales. Keanggotaan ZNTX wajib berasal dari sumber server yang dipercaya, bukan dropdown Organization/Role atau metadata yang bisa diedit user. Jangan buat database user, layar login, atau manajemen user kedua.
+
+Jika Supabase Auth existing belum memiliki akun/keanggotaan internal, kondisi itu perlu diputuskan pemilik sistem terlebih dahulu; tidak ada autentikasi yang bisa direuse hanya dari state demo. Setelah identity tersedia, review grants/RLS untuk identitas Sales dengan SELECT terbatas, tanpa DML/DDL/akses fungsi mutasi. Bila role authenticated memiliki izin tulis existing, diperlukan isolasi role/claim Sales yang sesuai (atau jalur DB khusus read-only), bukan revoke global yang mengganggu aplikasi existing. Rancang SQL setelah audit katalog dan klaim token; jangan menjalankan perubahan production tanpa review/persetujuan. GET-only saja belum membuktikan keamanan level DB.
+
+Validasi UI lokal: login existing dan transisi `/sales` dengan workspace/role sudah diperiksa di browser; API tetap menampilkan blocker 401 dan tidak mengirim query production. Screenshot lokal disimpan pada outputs/ untuk review. Automated tests kini tujuh kasus. Docker belum tersedia.

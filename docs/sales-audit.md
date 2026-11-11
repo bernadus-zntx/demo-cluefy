@@ -53,3 +53,11 @@ Sales kini menyediakan form demo tanpa mengirim/menyimpan credentials. Akses API
 Persyaratan login demo + tidak ada akses anon + tidak ada service_role belum menyediakan identitas database untuk live SELECT. Database-level read-only juga belum dapat dibuktikan tanpa audit grants/RLS identitas tersebut. Tidak ada perubahan production dibuat. Status yang benar: demo UI dan pengamanan fail-closed siap review, integrasi auth dan data live masih terblokir. Bagian cache 30 detik pada audit awal di atas sudah digantikan pembacaan per-user tanpa shared cache.
 
 Validasi update: enam tes otomatis, sintaks server/frontend, whitespace. Docker tidak tersedia; build/container dan verifikasi Debian/iCentra belum dilakukan. Tidak ada deployment, secrets, perubahan existing atau production.
+
+## Update reuse desain login existing
+
+Login Sales sekarang dihasilkan langsung dari markup Login app/page.tsx, CSS login/responsive existing, dan logo existing melalui sales/sync-existing-login.mjs. Tidak ada halaman/desain login baru atau authentication system baru. Organization/Role/Email/Password dipertahankan; Role mengikuti conditional government existing. Submit memindahkan tampilan ke dashboard /sales dan menampilkan workspace/role. Credentials demo tidak dikirim/disimpan; pilihan tersebut tidak dianggap otorisasi.
+
+Verifikasi source tetap menyimpulkan simulasi: handler existing hanya preventDefault lalu onLogin(account,role); callback setLoggedIn(true), tanpa verifikasi email/password/token/session. Solusi minimum yang diusulkan adalah menghubungkan submit form yang sama ke Supabase Auth existing bila akun internal tersedia, memverifikasi session pada API, lalu menerapkan grants/RLS khusus Sales tanpa hak mutasi. Ketersediaan akun/membership dan izin database belum diverifikasi. Tidak ada solusi aman untuk data live dengan hanya state demo, tanpa identitas trusted, akses anon, atau credential admin. Detail proposal dan prasyarat di sales/README.md; tidak ada perubahan production dilakukan.
+
+Tujuh tes otomatis dan pemeriksaan sinkronisasi markup/CSS/logo lulus; browser lokal mengonfirmasi login existing, navigasi /sales dan blocker data. Tampilan dibandingkan dengan source repo, bukan screenshot user (lampiran tersebut tidak tersedia pada chat ini). Docker build belum dapat dijalankan.
