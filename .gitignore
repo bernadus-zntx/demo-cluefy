@@ -40,3 +40,7 @@ yarn-error.log*
 /.wrangler/
 /outputs/
 /work/
+
+/sales/node_modules/
+/sales/certs/*
+!/sales/certs/.gitkeep

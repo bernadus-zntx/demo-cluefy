@@ -1,55 +1,76 @@
-# ClueFy Sales — demo UI, production access blocked
+# ClueFy Sales: live database read-only proxy
 
-Keputusan user: gunakan login demo existing tanpa membangun authentication/user management baru. Form Sales mengikuti perilaku demo: input email/password hanya membuka tampilan lokal, tidak memverifikasi identitas, tidak mengirim/menyimpan password, dan tidak memberikan izin API. **Ini bukan autentikasi atau pembatas akses internal ZNTX.** Jangan masukkan password sungguhan.
+Login dan desain existing tetap frontend simulation; submit membuka `/sales`. Organization/Role/Email/Password mengikuti existing. Tidak ada authentication/session baru. Backend mengambil data langsung dari PostgreSQL Supabase production dengan login database khusus `cluefy_sales_reader`, bukan anon/SDK/service_role. Browser hanya menerima JSON tujuh kolom artikel, tidak pernah connection string atau password.
 
-Audit mengonfirmasi `app/page.tsx` hanya memanggil setLoggedIn(true), dan docs/operational-features.md menyatakan login tidak mengautentikasi. Helper app/chatgpt-auth.ts tidak digunakan dan header identitas bukan bukti session terpercaya. User mengonfirmasi demo ini yang digunakan app.cluefy.co.
+## Arsitektur dan batas
 
-## Status dan batas data
+Satu container Node, bind `127.0.0.1:3117`, tanpa crawler/Postgres/PostgREST lokal. Endpoint data satu-satunya `GET /api/items`, query SQL tetap, tanpa query parameters; maksimum 100 artikel terbaru berdasarkan published_at dan id. Kolom: id, title, excerpt, publisher, platform, location, published_at. Search di browser hanya mencakup 100 artikel tersebut. GET static assets dan `/healthz` tidak mengakses database. Semua metode selain GET ditolak 405 dan route crawler/mutasi tidak ada. API sengaja tidak memerlukan session sesuai keputusan user; akses service tetap loopback/internal, jangan publish port atau menambah reverse proxy publik.
 
-Viewer membaca maksimal 100 artikel (judul, excerpt, penerbit, platform, lokasi, waktu; pencarian lokal). Tidak ada crawler, database lokal, PostgREST lokal, mutasi, RPC, atau pengambilan artikel eksternal.
+Koneksi menggunakan verified TLS (rejectUnauthorized true), pool maksimum 2, timeout koneksi 5 detik/query 8 detik. Setiap request data memakai transaksi `BEGIN READ ONLY`, pemeriksaan role dan effective privileges, kemudian fixed SELECT LIMIT 100. Tidak ada shared cache: refresh membaca snapshot baru production. Kegagalan konfigurasi menghasilkan 503, izin/koneksi/query gagal 502, tanpa detail database/secrets di respons/log. Data kosong berarti tidak ada baris pada snapshot yang dapat dibaca, bukan fallback dummy.
 
-**Akses production sengaja terkunci.** Login demo tidak menghasilkan identitas/JWT untuk RLS. API menolak semua permintaan data secara default (401) dan tidak mengirim query anon ke production, walaupun publishable key dikonfigurasi. Klaim “semua fitur live” atau “database read-only terverifikasi” belum dapat diberikan.
+Pemeriksaan menolak role lain, superuser/BYPASSRLS/CREATEROLE/CREATEDB/replication, role membership, hak tulis tabel/kolom, ownership tabel, schema/database CREATE, sequence USAGE/UPDATE, dan EXECUTE fungsi SECURITY DEFINER non-system yang accessible. Ini mencakup grants dari PUBLIC; `NOINHERIT` tidak menghapus grants PUBLIC. Hak baca tujuh kolom, RLS aktif, dan SELECT policy khusus role wajib ada. Audit dijalankan setiap baca agar perubahan privilege berikutnya memblokir aplikasi.
 
-Batas integrasi server `authenticate` disiapkan untuk session existing yang terverifikasi: userId, internalZntx dan accessToken. Belum ada adapter production terpasang; CLI selalu memakai deny-by-default. Hanya tes yang menyuntikkan identitas tiruan. Tidak boleh membuat adapter dari form demo, header user/email, atau JWT yang hanya di-decode. Adapter nyata harus memverifikasi session/token, expiry, issuer/audience, dan keanggotaan ZNTX dari sumber terpercaya. Ini bukan sistem login baru dan belum merupakan integrasi auth yang selesai.
+## Konfigurasi database MANUAL — belum dijalankan
 
-Jika suatu hari adapter tersedia, tiap request memakai token user di Authorization bersama public application key dan tunduk RLS; tidak ada shared cache antar-user. Tidak ada fallback anon/admin. Key secret/service_role ditolak. Proyeksi endpoint tetap, timeout 8 detik, redirect ditolak, error disanitasi dan CSP/textContent melindungi rendering.
+Tidak ada SQL di sini yang diterapkan otomatis oleh app, Docker, CI, atau migration existing. Review dan persetujuan pemilik production diperlukan sebelum langkah yang mengubah database.
 
-Publishable key bukan izin database read-only. Sebelum aktivasi harus dibuktikan grants/RLS membolehkan hanya SELECT yang dibutuhkan dan menolak mutasi serta RPC berefek tulis untuk identitas Sales, termasuk lewat API langsung. Bila identitas authenticated existing dapat menulis, token itu tidak memenuhi persyaratan Sales. Jangan revoke hak authenticated secara global karena dapat merusak existing. Tidak ada policy/schema/grants production diubah pada pekerjaan ini.
+1. Review `sql/01-create-reader.sql`: membuat role baru tanpa hak admin/BYPASSRLS atau membership; grant CONNECT + schema USAGE + SELECT tujuh kolom saja; default read-only dan timeout; policy `FOR SELECT TO cluefy_sales_reader USING (true)` pada crawl_items. Ini memberi internal Sales akses seluruh baris pada tabel tersebut melalui kolom yang diizinkan. Tidak mengubah policy/role/grant anon, authenticated, atau service_role. RLS existing wajib sudah aktif. Script fail pada rerun; jangan drop existing role/policy tanpa review.
+2. Setelah disetujui, administrator menjalankan script tersebut melalui Supabase SQL Editor atau psql admin. Script tidak memiliki password. Set password role secara interaktif dengan psql `\password cluefy_sales_reader` menggunakan koneksi admin verified TLS; jangan menyimpan password di SQL/repo/chat/log.
+3. Administrator menjalankan `sql/02-audit-reader.sql` (catalog SELECT saja). Role flags harus non-admin, membership kosong, hak tulis/CREATE/sequence kosong, executable SECURITY DEFINER kosong, dan hanya tujuh kolom artikel yang diberikan script yang readable kecuali ada grants SELECT existing yang sudah direview. Pastikan policy baru hanya role reader; restrictive policies existing dapat tetap membatasi baris.
+4. Bila ada hak berbahaya dari PUBLIC, **STOP**, jangan otomatis REVOKE PUBLIC atau mengubah shared roles. DBA harus mereview sumber privilege dan dampak perubahan terhadap deployment existing. App sengaja menolak konfigurasi seperti itu. Pemberian SELECT saja tidak menghilangkan hak bawaan PUBLIC. Fungsi definer yang terlihat read-only juga tidak di-allowlist otomatis.
+5. Ambil host production dari Supabase Dashboard **Connect**. Direct: username `cluefy_sales_reader`, host `db.<projectref>.supabase.co:5432`; jika Debian membutuhkan IPv4, gunakan **session pooler** host dari Dashboard dengan username `cluefy_sales_reader.<projectref>` (biasanya port 5432). Dukungan custom role pada pooler perlu diperiksa pada project. Transaction pooler 6543 juga didukung oleh app (tanpa prepared statements/session state di luar transaksi), tetapi session pooler adalah pilihan awal untuk container persisten ini.
+6. Buat file `/opt/cluefy-sales/.env.sales`, izin 600, berdasarkan `.env.example`. Isi `SALES_DATABASE_URL` dengan URL postgres role reader, password di-percent-encode. Database harus `postgres`, jangan tambahkan query string `sslmode` atau parameter SSL lain; TLS diatur driver dan tidak boleh dimatikan. Jangan pakai user postgres, credentials existing, publishable key, service_role, atau SUPABASE_SECRET_KEY.
+7. Download CA dari Dashboard bila diperlukan untuk certificate chain production, simpan di `sales/certs/prod-ca.crt` (bukan credential), set `SALES_DATABASE_CA_FILE=/app/certs/prod-ca.crt` untuk Docker atau absolute path host untuk proses lokal. Jika CA kosong, Node memakai trust store default; koneksi gagal jika certificate tidak trusted, tanpa fallback insecure. Folder certs di-mount read-only dan tidak masuk image. Jangan menonaktifkan certificate verification.
 
-## Validasi
+Dokumentasi resmi: https://supabase.com/docs/guides/database/connecting-to-postgres dan https://supabase.com/docs/guides/platform/ssl-enforcement . Tidak ada query ke production dilakukan dalam development ini.
+
+## Build dan test tanpa database production
+
+Dari root repository:
 
 ```sh
+npm ci --prefix sales --ignore-scripts
+node sales/sync-existing-login.mjs --check
 node --test sales/tests/*.test.mjs
 node --check sales/server.mjs
-node --check sales/public/app.js
+node --check sales/database.mjs
 docker compose -f sales/compose.yaml config --quiet
 docker build -t cluefy-sales:review sales
 ```
 
-Enam tes menggunakan loopback dan upstream tiruan, tanpa production/secrets. Docker belum tersedia di lingkungan development; Compose/build/smoke container belum dijalankan. Workflow PR Sales mengetes dan build saja, tanpa deploy/secrets. Workflow existing tetap dapat berjalan sesuai trigger-nya.
+Tes memakai driver/database tiruan dan HTTP loopback. Menguji config, TLS options, transaksi read-only, audit privileges, rollback/release, batas 100, proyeksi/error sanitization, blokir mutasi/query injection dan reuse assets existing. Tidak menjalankan database/crawler lokal. SQL PostgreSQL belum diuji terhadap server sungguhan; validasi katalog dan koneksi target masih diperlukan. Node lokal 24; CI/container menarget Node 22. Workflow Sales build/test saja, tanpa deploy/secrets; workflow existing tetap ada.
 
-## Debian: hanya setelah persetujuan deployment
+## Validasi koneksi setelah provisioning disetujui
 
-1. Periksa kapasitas, container/network/volume existing, dan port 3117 (`ss -ltn`). Jangan menyentuh ClueFy existing atau iCentra.
-2. Tempatkan folder sales dalam direktori baru `/opt/cluefy-sales`. Compose memakai project unik cluefy-sales, satu container non-root, tanpa volume/network external, resource limit dan filesystem read-only.
-3. Build dan jalankan hanya `sales/compose.yaml`; jangan root Compose. Port tetap loopback `127.0.0.1:3117`; gunakan SSH tunnel. Login demo bukan alasan membuka service ke internet.
-4. Untuk review demo biarkan konfigurasi Supabase kosong; healthz membuktikan proses sehat, bukan koneksi data. API akan tetap 401, termasuk setelah demo login.
-5. Jangan isi secrets atau mengaktifkan data sebelum jalur identity + database read-only diselesaikan dan disetujui. Gunakan konfigurasi terpisah berizin 600, tidak menyalin .env existing. Jangan mencetak config berisi key.
-6. Sesudah jalur tersebut disetujui, uji baca sampel production dengan GET dan inspeksi grants/RLS secara read-only. Jangan mencoba mutasi terhadap production untuk validasi.
-7. Rollback hanya project Sales dengan `docker compose -p cluefy-sales -f /opt/cluefy-sales/compose.yaml down` (sertakan environment Sales bila diperlukan). Jangan prune, down -v, atau stop existing.
+Dengan konfigurasi reader pada mesin yang diizinkan, jalankan dari folder sales:
 
-Build context Docker hanya allowlist server/assets; tidak membawa secrets, worker, atau migration. Tidak ada deployment dilakukan. Base image belum dipin digest/discan. Tampilan demo tidak menyelesaikan persyaratan keamanan level database; jangan mengiklankan kandidat ini sebagai siap production.
+```sh
+node --env-file=/opt/cluefy-sales/.env.sales check-database.mjs
+```
 
-## Reuse halaman login existing (update)
+Untuk proses lokal, CA_FILE harus path host; path `/app/certs/...` hanya ada dalam container. Checker melakukan catalog SELECT dan query artikel dalam READ ONLY, tidak mencoba INSERT/UPDATE/DELETE atau mengubah grants. Output hanya PASS/FAIL dan jumlah baris; tidak mencetak connection string, data artikel, atau raw errors. PASS dengan 0 baris membuktikan query berhasil tetapi perlu konfirmasi pemilik data tentang isi yang diharapkan. Jika gagal, jalankan audit katalog dengan DBA dan cek TLS/host/user/password/network; jangan downgrade credentials ke admin. Jangan menguji mutasi terhadap production. Pengujian negatif DML/DDL yang benar-benar mengeksekusi statement hanya boleh dilakukan pada environment disposable terpisah yang disetujui, bukan production.
 
-Login ringkas Sales sebelumnya telah diganti hasil ekstraksi markup `Login` dari `app/page.tsx`, CSS login/responsive/tokens dari `app/globals.css`, serta logo existing. Organization, Role (terlihat untuk government seperti existing), Email, Password, Remember me, dan Forgot password mempertahankan desain/perilaku demo existing. Tidak ada perubahan pada source app existing. Tidak ada screenshot lampiran yang dapat diakses dalam chat ini; referensi visual yang digunakan adalah source repository.
+## Debian setelah persetujuan deployment
 
-`node sales/sync-existing-login.mjs` meregenerasi assets; `--check` memverifikasi assets tidak berbeda dari source existing. Generator gagal bila struktur source berubah agar perubahan direview, bukan diam-diam menghasilkan login berbeda. Build Docker memakai hasil generate yang diverifikasi CI, tanpa membawa source dashboard existing. Setelah submit, URL berpindah ke `/sales` dan workspace/role terpilih ditampilkan. Refresh menampilkan login demo lagi, sesuai state login existing yang tidak persisten. Organization/Role bukan otorisasi; Remember me/Forgot password tetap simulasi dan tidak menghasilkan session.
+1. Periksa kapasitas host, layanan/iCentra/ClueFy existing dan port 3117. Tempatkan folder Sales di direktori baru `/opt/cluefy-sales`; jangan overwrite Compose/.env/proxy existing. Jangan ubah project name `cluefy-sales` menjadi project existing.
+2. Konfigurasi file env terpisah sesuai petunjuk di atas. Pastikan folder certs ada dan readable oleh user container node. Jalankan `docker compose --env-file /opt/cluefy-sales/.env.sales -f /opt/cluefy-sales/compose.yaml config --quiet`; jangan cetak config karena mengandung database password.
+3. Build dan start HANYA Compose Sales setelah approval deployment:
 
-### Solusi perubahan minimum — usulan, belum diimplementasikan
+```sh
+docker compose --env-file /opt/cluefy-sales/.env.sales -f /opt/cluefy-sales/compose.yaml up --build -d
+```
 
-Tetap gunakan form/desain ini. Ganti hanya submit handler simulasi dengan pemanggilan **Supabase Auth production yang sama**, jika memang sudah ada akun internal di layanan tersebut, lalu gunakan session user yang diverifikasi server untuk API Sales. Keanggotaan ZNTX wajib berasal dari sumber server yang dipercaya, bukan dropdown Organization/Role atau metadata yang bisa diedit user. Jangan buat database user, layar login, atau manajemen user kedua.
+4. Validasi DB melalui container yang sudah berjalan (CA path container):
 
-Jika Supabase Auth existing belum memiliki akun/keanggotaan internal, kondisi itu perlu diputuskan pemilik sistem terlebih dahulu; tidak ada autentikasi yang bisa direuse hanya dari state demo. Setelah identity tersedia, review grants/RLS untuk identitas Sales dengan SELECT terbatas, tanpa DML/DDL/akses fungsi mutasi. Bila role authenticated memiliki izin tulis existing, diperlukan isolasi role/claim Sales yang sesuai (atau jalur DB khusus read-only), bukan revoke global yang mengganggu aplikasi existing. Rancang SQL setelah audit katalog dan klaim token; jangan menjalankan perubahan production tanpa review/persetujuan. GET-only saja belum membuktikan keamanan level DB.
+```sh
+docker compose --env-file /opt/cluefy-sales/.env.sales -f /opt/cluefy-sales/compose.yaml exec -T sales node check-database.mjs
+curl --fail http://127.0.0.1:3117/healthz
+curl --fail http://127.0.0.1:3117/api/items
+```
 
-Validasi UI lokal: login existing dan transisi `/sales` dengan workspace/role sudah diperiksa di browser; API tetap menampilkan blocker 401 dan tidak mengirim query production. Screenshot lokal disimpan pada outputs/ untuk review. Automated tests kini tujuh kasus. Docker belum tersedia.
+Jangan salin output data artikel ke log publik. `/healthz` hanya proses/config, bukan bukti koneksi database. Buka melalui SSH tunnel; port hanya loopback. Image non-root, filesystem read-only, capabilities dibuang dan resources dibatasi. Tidak ada shared data volumes/network external; hanya CA folder read-only.
+5. Periksa health/resources existing sebelum/sesudah. Rollback hanya project Sales dengan file Compose/env Sales dan `down`; jangan `down -v`, prune, atau stop service existing. Untuk menonaktifkan credential reader, DBA dapat `ALTER ROLE cluefy_sales_reader NOLOGIN` setelah review (koneksi aktif perlu ditangani terpisah); jangan drop tabel/policy existing.
+
+## Reuse desain login
+
+`node sales/sync-existing-login.mjs` menghasilkan markup Login dari app/page.tsx, CSS/responsive dari app/globals.css dan logo existing. CI memakai `--check` untuk mendeteksi drift. Tidak ada source app existing yang diubah. Submit langsung ke `/sales`; Organization dan Role terpilih ditampilkan. Generator mempertahankan teks/desain existing; tidak membangun sistem login/user management baru.

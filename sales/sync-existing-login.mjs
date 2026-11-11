@@ -21,7 +21,7 @@ const replacements = [
   ['defaultValue={account==="government"?"admin@badung.go.id":account==="validation"?"validation@olx.co.id":"admin@cluebeauty.id"} key={account}', 'id="email" value="admin@badung.go.id"'],
   ['defaultValue="cluefy-demo"', 'value="cluefy-demo"'],
   ['defaultChecked', 'checked'],
-  ['Live data mode — dashboard tidak menampilkan fallback dummy.', 'Login simulasi — belum memverifikasi identitas; akses data production terkunci.'],
+  ['Live data mode — dashboard tidak menampilkan fallback dummy.', 'Live data mode — dashboard tidak menampilkan fallback dummy.'],
 ];
 for (const [from, to] of replacements) {
   if (!login.includes(from)) throw Error(`Existing login changed: missing ${from}`);

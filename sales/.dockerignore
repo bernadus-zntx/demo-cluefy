@@ -2,3 +2,7 @@
 !server.mjs
 !public
 !public/**
+!database.mjs
+!check-database.mjs
+!package.json
+!package-lock.json

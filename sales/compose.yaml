@@ -9,8 +9,10 @@ services:
     ports:
       - "127.0.0.1:3117:3000"
     environment:
-      SALES_SUPABASE_URL: ${SALES_SUPABASE_URL:-}
-      SALES_SUPABASE_KEY: ${SALES_SUPABASE_KEY:-}
+      SALES_DATABASE_URL: ${SALES_DATABASE_URL:-}
+      SALES_DATABASE_CA_FILE: ${SALES_DATABASE_CA_FILE:-}
+    volumes:
+      - ./certs:/app/certs:ro
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
