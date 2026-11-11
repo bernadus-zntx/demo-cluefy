@@ -44,3 +44,5 @@ yarn-error.log*
 /sales/node_modules/
 /sales/certs/*
 !/sales/certs/.gitkeep
+
+/sales/dist/

@@ -2,7 +2,24 @@
   "name": "cluefy-sales",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.13.0" },
-  "scripts": { "start": "node server.mjs", "test": "node --test tests/*.test.mjs", "check:database": "node check-database.mjs" },
-  "dependencies": { "pg": "8.16.3" }
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "check:database": "node check-database.mjs",
+    "build": "vite build --config vite.config.mjs"
+  },
+  "dependencies": {
+    "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwindcss": "^4.2.1",
+    "vite": "^8.3.8"
+  }
 }

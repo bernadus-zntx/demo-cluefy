@@ -1,0 +1,5 @@
+body{padding-top:40px}
+.sales-notice{position:fixed;inset:0 0 auto;z-index:9999;height:40px;display:flex;align-items:center;justify-content:center;background:#123e39;color:white;text-align:center;padding:4px 12px;font:12px/1.4 system-ui;box-sizing:border-box}
+.app-shell>aside{top:40px}
+.login-page,.app-shell{min-height:calc(100vh - 40px)}
+@media(max-width:760px){body{padding-top:60px}.sales-notice{height:60px;font-size:11px}.app-shell>aside{top:60px}.login-page,.app-shell{min-height:calc(100vh - 60px)}}

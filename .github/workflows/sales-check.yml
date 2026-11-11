@@ -4,9 +4,10 @@ on:
     paths:
       - 'sales/**'
       - '.github/workflows/sales-check.yml'
-      - 'app/page.tsx'
-      - 'app/globals.css'
-      - 'public/cluefy-icon-exact.png'
+      - 'app/**'
+      - 'lib/**'
+      - 'public/**'
+      - '.dockerignore'
 permissions:
   contents: read
 jobs:
@@ -19,10 +20,10 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --prefix sales --ignore-scripts
-      - run: node sales/sync-existing-login.mjs --check
+      - run: npm run build --prefix sales
       - run: node --test sales/tests/*.test.mjs
       - run: docker compose -f sales/compose.yaml config --quiet
-      - run: docker build -t cluefy-sales:check sales
+      - run: docker build -f sales/Dockerfile -t cluefy-sales:check .
       - name: Smoke Sales container without production credentials
         run: |
           docker run -d --name cluefy-sales-check --read-only --cap-drop ALL --security-opt no-new-privileges:true -p 127.0.0.1:3117:3000 cluefy-sales:check

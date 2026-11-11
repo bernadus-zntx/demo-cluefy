@@ -1,14 +1,52 @@
-# ClueFy Sales: live database read-only proxy
+# ClueFy Sales — dashboard existing, Supabase read-only
 
-Login dan desain existing tetap frontend simulation; submit membuka `/sales`. Organization/Role/Email/Password mengikuti existing. Tidak ada authentication/session baru. Backend mengambil data langsung dari PostgreSQL Supabase production dengan login database khusus `cluefy_sales_reader`, bukan anon/SDK/service_role. Browser hanya menerima JSON tujuh kolom artikel, tidak pernah connection string atau password.
+Sales membundel langsung `app/page.tsx`, seluruh komponen `app/intelligence/`, Ara Assistant, CSS dan aset `public/` dari repo demo-cluefy. Tidak ada dashboard pengganti. Login organization/role/email/password tetap simulasi dalam React; `/` dan `/sales` membuka aplikasi yang sama. Login bukan autentikasi atau batas akses backend.
 
-## Arsitektur dan batas
+Build Vite khusus Sales mengganti provider LiveIntelligence dengan adapter `sales/ui/LiveIntelligence.tsx`. Adapter membaca hanya `GET /api/items`, mengubah tujuh kolom ke struktur yang dibutuhkan UI existing, dan refresh tiap 60 detik. Tidak memakai Next API routes, crawler, service_role atau SDK Supabase di runtime. Enrichment otomatis dimatikan untuk build Sales. Cases/Findings dan workspace demo existing tetap simulasi lokal; aksi yang membutuhkan backend tulis ditolak 405 dan tidak tersimpan ke production. Banner menjelaskan batas ini di semua halaman.
 
-Satu container Node, bind `127.0.0.1:3117`, tanpa crawler/Postgres/PostgREST lokal. Endpoint data satu-satunya `GET /api/items`, query SQL tetap, tanpa query parameters; maksimum 100 artikel terbaru berdasarkan published_at dan id. Kolom: id, title, excerpt, publisher, platform, location, published_at. Search di browser hanya mencakup 100 artikel tersebut. GET static assets dan `/healthz` tidak mengakses database. Semua metode selain GET ditolak 405 dan route crawler/mutasi tidak ada. API sengaja tidak memerlukan session sesuai keputusan user; akses service tetap loopback/internal, jangan publish port atau menambah reverse proxy publik.
+## Batas data
 
-Koneksi menggunakan verified TLS (rejectUnauthorized true), pool maksimum 2, timeout koneksi 5 detik/query 8 detik. Setiap request data memakai transaksi `BEGIN READ ONLY`, pemeriksaan role dan effective privileges, kemudian fixed SELECT LIMIT 100. Tidak ada shared cache: refresh membaca snapshot baru production. Kegagalan konfigurasi menghasilkan 503, izin/koneksi/query gagal 502, tanpa detail database/secrets di respons/log. Data kosong berarti tidak ada baris pada snapshot yang dapat dibaca, bukan fallback dummy.
+Maksimum 100 artikel terbaru: id, title, excerpt, publisher, platform, location, published_at. Search/filter/angka dashboard berlaku hanya pada snapshot ini, bukan seluruh database. URL sumber, full body, sentiment, klasifikasi, AI, reach, engagement, komentar, crawler rules/runs dan media partner tidak diizinkan oleh reader saat ini; adapter tidak mengarang nilainya. Gunakan filter periode **All time** jika artikel terbaru berada di luar periode default dashboard. Workspace government memakai data live; workspace beauty/validation mempertahankan simulasi existing.
 
-Pemeriksaan menolak role lain, superuser/BYPASSRLS/CREATEROLE/CREATEDB/replication, role membership, hak tulis tabel/kolom, ownership tabel, schema/database CREATE, sequence USAGE/UPDATE, dan EXECUTE fungsi SECURITY DEFINER non-system yang accessible. Ini mencakup grants dari PUBLIC; `NOINHERIT` tidak menghapus grants PUBLIC. Hak baca tujuh kolom, RLS aktif, dan SELECT policy khusus role wajib ada. Audit dijalankan setiap baca agar perubahan privilege berikutnya memblokir aplikasi.
+Backend `database.mjs` dan SQL reader tidak berubah: verified TLS, pool 2 koneksi, transaksi READ ONLY, audit effective privileges/RLS setiap baca, fixed SELECT LIMIT 100, sanitasi error, tidak ada SQL dinamis. `/healthz` hanya memeriksa proses/config; `check:database` membuktikan koneksi dan izin baca. Database failure menghasilkan 502, belum dikonfigurasi 503, tanpa fallback dummy.
+
+## Build dan verifikasi lokal
+
+Dari root repo (Node >=22.13):
+
+```sh
+npm ci --prefix sales --ignore-scripts
+npm test --prefix sales
+node --check sales/server.mjs
+node --check sales/database.mjs
+docker compose -f sales/compose.yaml config --quiet
+docker build -f sales/Dockerfile -t cluefy-sales:review .
+```
+
+Build context sekarang **root repo**, karena dashboard ada di `app/`, `lib/`, dan `public/`. Compose mengatur context ini otomatis. Jangan gunakan `docker build sales` atau menyalin hanya folder sales. Multi-stage Docker mengompilasi UI lalu menyalin hanya dist dan dependency pg ke image runtime, tanpa source Next API atau secrets. Frontend hasil build ada di `sales/dist/` (diabaikan Git). `sync-existing-login.mjs` dan `sales/public/` adalah artefak frontend lama, tidak dipakai build/runtime baru.
+
+Tes menjalankan build dashboard dan HTTP loopback dengan database tiruan: pembatasan metode, tujuh kolom, limit, sanitasi, TLS, audit role, rollback, aset bundle, traversal path dan logo. Tidak menyentuh database production.
+
+## Update deployment Debian yang sudah berjalan
+
+Sediakan perubahan repo ini di `/home/user104/cluefy/cluefy-sales`, pertahankan `sales/.env` dan folder `sales/certs` yang sudah bekerja. Tidak perlu menjalankan ulang SQL provisioning reader yang sudah PASS.
+
+```sh
+cd /home/user104/cluefy/cluefy-sales/sales
+docker compose --env-file .env config --quiet
+docker compose --env-file .env build sales
+docker compose --env-file .env up -d --no-deps sales
+docker compose --env-file .env exec -T sales node check-database.mjs
+docker compose --env-file .env ps
+curl --fail http://127.0.0.1:3117/healthz
+curl --fail --silent http://127.0.0.1:3117/sales > /dev/null
+```
+
+Buka melalui SSH tunnel port 3117 lalu login simulasi, pilih Kabupaten Badung, periksa Overview dan Conversations/Aspirasi Warga. Pastikan artikel live tampil, filter berfungsi, navigasi tidak blank dan refresh tetap membaca data. Tanpa credentials, login/navigasi tetap terbuka dan panel live menunjukkan error konfigurasi.
+
+Compose mempertahankan project `cluefy-sales`, service/image, `127.0.0.1:3117:3000`, user non-root, filesystem read-only, cert mount read-only, healthcheck dan semua resource/security limits. Tidak membuat database/crawler/network external atau mengubah iCentra. Jangan jalankan root compose, prune, atau down project lain. Jangan mencetak hasil compose config tanpa `--quiet` karena memuat password.
+
+Untuk rollback, simpan tag image lama sebelum build (`docker image tag cluefy-sales:review cluefy-sales:previous`). Jika diperlukan, tag kembali previous sebagai review lalu jalankan `docker compose --env-file .env up -d --no-deps --force-recreate sales` tanpa build. Ini hanya mengganti Sales.
 
 ## Konfigurasi database MANUAL — belum dijalankan
 
@@ -23,54 +61,3 @@ Tidak ada SQL di sini yang diterapkan otomatis oleh app, Docker, CI, atau migrat
 7. Download CA dari Dashboard bila diperlukan untuk certificate chain production, simpan di `sales/certs/prod-ca.crt` (bukan credential), set `SALES_DATABASE_CA_FILE=/app/certs/prod-ca.crt` untuk Docker atau absolute path host untuk proses lokal. Jika CA kosong, Node memakai trust store default; koneksi gagal jika certificate tidak trusted, tanpa fallback insecure. Folder certs di-mount read-only dan tidak masuk image. Jangan menonaktifkan certificate verification.
 
 Dokumentasi resmi: https://supabase.com/docs/guides/database/connecting-to-postgres dan https://supabase.com/docs/guides/platform/ssl-enforcement . Tidak ada query ke production dilakukan dalam development ini.
-
-## Build dan test tanpa database production
-
-Dari root repository:
-
-```sh
-npm ci --prefix sales --ignore-scripts
-node sales/sync-existing-login.mjs --check
-node --test sales/tests/*.test.mjs
-node --check sales/server.mjs
-node --check sales/database.mjs
-docker compose -f sales/compose.yaml config --quiet
-docker build -t cluefy-sales:review sales
-```
-
-Tes memakai driver/database tiruan dan HTTP loopback. Menguji config, TLS options, transaksi read-only, audit privileges, rollback/release, batas 100, proyeksi/error sanitization, blokir mutasi/query injection dan reuse assets existing. Tidak menjalankan database/crawler lokal. SQL PostgreSQL belum diuji terhadap server sungguhan; validasi katalog dan koneksi target masih diperlukan. Node lokal 24; CI/container menarget Node 22. Workflow Sales build/test saja, tanpa deploy/secrets; workflow existing tetap ada.
-
-## Validasi koneksi setelah provisioning disetujui
-
-Dengan konfigurasi reader pada mesin yang diizinkan, jalankan dari folder sales:
-
-```sh
-node --env-file=/opt/cluefy-sales/.env.sales check-database.mjs
-```
-
-Untuk proses lokal, CA_FILE harus path host; path `/app/certs/...` hanya ada dalam container. Checker melakukan catalog SELECT dan query artikel dalam READ ONLY, tidak mencoba INSERT/UPDATE/DELETE atau mengubah grants. Output hanya PASS/FAIL dan jumlah baris; tidak mencetak connection string, data artikel, atau raw errors. PASS dengan 0 baris membuktikan query berhasil tetapi perlu konfirmasi pemilik data tentang isi yang diharapkan. Jika gagal, jalankan audit katalog dengan DBA dan cek TLS/host/user/password/network; jangan downgrade credentials ke admin. Jangan menguji mutasi terhadap production. Pengujian negatif DML/DDL yang benar-benar mengeksekusi statement hanya boleh dilakukan pada environment disposable terpisah yang disetujui, bukan production.
-
-## Debian setelah persetujuan deployment
-
-1. Periksa kapasitas host, layanan/iCentra/ClueFy existing dan port 3117. Tempatkan folder Sales di direktori baru `/opt/cluefy-sales`; jangan overwrite Compose/.env/proxy existing. Jangan ubah project name `cluefy-sales` menjadi project existing.
-2. Konfigurasi file env terpisah sesuai petunjuk di atas. Pastikan folder certs ada dan readable oleh user container node. Jalankan `docker compose --env-file /opt/cluefy-sales/.env.sales -f /opt/cluefy-sales/compose.yaml config --quiet`; jangan cetak config karena mengandung database password.
-3. Build dan start HANYA Compose Sales setelah approval deployment:
-
-```sh
-docker compose --env-file /opt/cluefy-sales/.env.sales -f /opt/cluefy-sales/compose.yaml up --build -d
-```
-
-4. Validasi DB melalui container yang sudah berjalan (CA path container):
-
-```sh
-docker compose --env-file /opt/cluefy-sales/.env.sales -f /opt/cluefy-sales/compose.yaml exec -T sales node check-database.mjs
-curl --fail http://127.0.0.1:3117/healthz
-curl --fail http://127.0.0.1:3117/api/items
-```
-
-Jangan salin output data artikel ke log publik. `/healthz` hanya proses/config, bukan bukti koneksi database. Buka melalui SSH tunnel; port hanya loopback. Image non-root, filesystem read-only, capabilities dibuang dan resources dibatasi. Tidak ada shared data volumes/network external; hanya CA folder read-only.
-5. Periksa health/resources existing sebelum/sesudah. Rollback hanya project Sales dengan file Compose/env Sales dan `down`; jangan `down -v`, prune, atau stop service existing. Untuk menonaktifkan credential reader, DBA dapat `ALTER ROLE cluefy_sales_reader NOLOGIN` setelah review (koneksi aktif perlu ditangani terpisah); jangan drop tabel/policy existing.
-
-## Reuse desain login
-
-`node sales/sync-existing-login.mjs` menghasilkan markup Login dari app/page.tsx, CSS/responsive dari app/globals.css dan logo existing. CI memakai `--check` untuk mendeteksi drift. Tidak ada source app existing yang diubah. Submit langsung ke `/sales`; Organization dan Role terpilih ditampilkan. Generator mempertahankan teks/desain existing; tidak membangun sistem login/user management baru.

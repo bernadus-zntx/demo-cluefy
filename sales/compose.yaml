@@ -3,7 +3,8 @@ services:
   sales:
     image: cluefy-sales:review
     build:
-      context: .
+      context: ..
+      dockerfile: sales/Dockerfile
     restart: unless-stopped
     init: true
     ports:

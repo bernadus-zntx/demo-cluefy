@@ -159,7 +159,7 @@ export function AspirasiWarga(){
   const pageCount=Math.max(1,Math.ceil(shown.length/pageSize));
   const currentPage=Math.min(page,pageCount);
   const paged=shown.slice((currentPage-1)*pageSize,currentPage*pageSize);
-  useEffect(()=>{const missing=paged.filter(record=>!record.content&&!contentRequests.current.has(record.id)).slice(0,2);if(!missing.length)return;for(const record of missing)contentRequests.current.add(record.id);void Promise.allSettled(missing.map(record=>fetch(`/api/intelligence/items/${record.id}/content`,{method:'POST'}))).then(()=>live.refresh())},[paged,live]);
+  useEffect(()=>{if(process.env.NEXT_PUBLIC_SALES_READ_ONLY==='true')return;const missing=paged.filter(record=>!record.content&&!contentRequests.current.has(record.id)).slice(0,2);if(!missing.length)return;for(const record of missing)contentRequests.current.add(record.id);void Promise.allSettled(missing.map(record=>fetch(`/api/intelligence/items/${record.id}/content`,{method:'POST'}))).then(()=>live.refresh())},[paged,live]);
   const toggleSource=(platform:string)=>setSources(current=>current.includes(platform)?current.filter(item=>item!==platform):[...current,platform]);
   const toggleGroup=(platforms:string[])=>setSources(current=>platforms.every(platform=>current.includes(platform))?current.filter(item=>!platforms.includes(item)):Array.from(new Set([...current,...platforms])));
   const openFinding=(record:Record)=>setModal({type:'finding',records:selected.length?items.filter(item=>selected.includes(item.id)):[record]});

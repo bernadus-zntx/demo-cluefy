@@ -82,9 +82,14 @@ test('unconfigured, failed DB and empty results have explicit sanitized response
   const empty=await serve(t,{config:configuration(env),database:{readArticles:async()=>[]}});
   assert.deepEqual((await (await fetch(empty+'/api/items')).json()).items,[]);
 });
-test('existing login and Sales assets preserve fields, logo and restrictive CSP', async t => {
+test('compiled existing dashboard assets and restrictive CSP', async t => {
   const origin=await serve(t,{config:null}); const response=await fetch(origin); const html=await response.text();
-  for(const label of ['ORGANIZATION','ROLE (SIMULASI)','EMAIL ADDRESS','PASSWORD','Kabupaten Badung','ClueBeauty Indonesia','OLX Indonesia']) assert.ok(html.includes(label));
+  assert.match(html, /<div id="root"><\/div>/);
+  const script=html.match(/src="([^"]+\.js)"/)[1];
+  const bundle=await (await fetch(origin+script)).text();
+  for(const label of ['ORGANIZATION','ROLE (SIMULASI)','EMAIL ADDRESS','Kabupaten Badung','ClueBeauty Indonesia','OLX Indonesia','/api/items','Executive Summary']) assert.ok(bundle.includes(label),label);
+  assert.equal((await fetch(origin+'/database.mjs')).status,404);
+  assert.equal((await fetch(origin+'/%2eenv')).status,404);
   assert.equal((await fetch(origin+'/sales')).status,200);
   assert.ok(response.headers.get('content-security-policy').includes("connect-src 'self'"));
   const image=await fetch(origin+'/cluefy-icon-exact.png'); assert.equal(image.headers.get('content-type'),'image/png');

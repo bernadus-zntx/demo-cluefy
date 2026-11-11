@@ -1,4 +1,6 @@
 import http from 'node:http';
+import { resolve, extname, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -9,7 +11,7 @@ const fields = ['id', 'title', 'excerpt', 'publisher', 'platform', 'location', '
 export function createSalesServer({ config = configuration(), database = null } = {}) {
   return http.createServer(async (req, res) => {
     const send = (status, data, type = 'application/json') => {
-      res.writeHead(status, { 'Content-Type': type.startsWith('image/') ? type : `${type}; charset=utf-8`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" });
+      res.writeHead(status, { 'Content-Type': type.startsWith('image/') ? type : `${type}; charset=utf-8`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'" });
       res.end(type === 'application/json' ? JSON.stringify(data) : data);
     };
     if (req.method !== 'GET') { res.setHeader('Allow', 'GET'); return send(405, { error: 'Sales hanya mendukung GET.' }); }
@@ -24,10 +26,18 @@ export function createSalesServer({ config = configuration(), database = null } 
         return send(200, { items, fetchedAt: new Date().toISOString(), message: items.length ? '' : 'Tidak ada artikel yang dapat dibaca pada snapshot ini.' });
       } catch { return send(502, { error: 'Koneksi/izin SELECT-only database belum valid atau query gagal. Periksa konfigurasi dan jalankan check:database.' }); }
     }
-    const assets = { '/sales': ['index.html', 'text/html'], '/existing-login.css': ['existing-login.css', 'text/css'], '/cluefy-icon-exact.png': ['cluefy-icon-exact.png', 'image/png'], '/': ['index.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
-    const asset = assets[url.pathname];
-    if (!asset) return send(404, { error: 'Tidak ditemukan.' });
-    try { send(200, await readFile(new URL(`./public/${asset[0]}`, import.meta.url), asset[1].startsWith('image/') ? null : 'utf8'), asset[1]); } catch { send(500, { error: 'Halaman tidak tersedia.' }); }
+    // Serve only the compiled existing dashboard and its public assets.
+    const root = resolve(fileURLToPath(new URL('./dist/', import.meta.url)));
+    const pathname = ['/', '/sales', '/sales/'].includes(url.pathname) ? '/index.html' : url.pathname;
+    let decoded;
+    try { decoded = decodeURIComponent(pathname); } catch { return send(400, {error:'Path tidak valid.'}); }
+    const filename = resolve(root, `.${decoded}`);
+    if (!filename.startsWith(root + sep) || decoded.includes('\\') || decoded.split('/').some(part=>part.startsWith('.'))) return send(404,{error:'Tidak ditemukan.'});
+    const types = {'.html':'text/html','.js':'text/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2','.ico':'image/x-icon'};
+    const type = types[extname(filename)];
+    if (!type) return send(404,{error:'Tidak ditemukan.'});
+    try { return send(200, await readFile(filename), type); }
+    catch { return send(404, {error:'Tidak ditemukan.'}); }
   });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
