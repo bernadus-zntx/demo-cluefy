@@ -19,10 +19,17 @@ async function load() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
     items = data.items;
-    status.textContent = data.message || `${items.length} artikel · Diambil ${new Date(data.fetchedAt).toLocaleString('id-ID')} · Cache hingga 30 detik`;
+    status.textContent = data.message || `${items.length} artikel · Diambil ${new Date(data.fetchedAt).toLocaleString('id-ID')}`;
   } catch (error) { items = []; status.textContent = error.message || 'Koneksi gagal.'; }
   finally { render(); button.disabled = false; }
 }
 button.addEventListener('click', load);
 document.querySelector('#search').addEventListener('input', render);
-void load();
+document.querySelector('#login-form').addEventListener('submit', event => {
+  event.preventDefault();
+  // Simulation only. Never transmit or persist the entered email/password.
+  document.querySelector('#login-form').reset();
+  document.querySelector('#demo-login').hidden = true;
+  document.querySelector('#dashboard').hidden = false;
+  void load();
+});

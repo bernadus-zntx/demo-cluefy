@@ -43,3 +43,13 @@ RLS tanpa policy pada crawl_items (berdasarkan chat, belum diverifikasi saat ini
 Sebelum aktivasi perlu persetujuan user atas audit, lingkup viewer minimal, sumber/kolom data yang boleh tampil, dan cara akses. Berikutnya validasi izin baca existing secara read-only dengan konfigurasi yang disetujui, lalu review host Debian dan build container. Deployment tetap memerlukan persetujuan terpisah. Detail prosedur di `sales/README.md`.
 
 Referensi resmi: https://supabase.com/docs/guides/getting-started/api-keys dan https://supabase.com/docs/guides/database/postgres/row-level-security — publishable tunduk RLS, secret bypass RLS, dan RLS tanpa policy menolak akses anon.
+
+## Update development: keputusan login demo
+
+User mengonfirmasi app.cluefy.co menggunakan login demo app/page.tsx dan meminta tetap menggunakan demo tanpa autentikasi baru. Form hanya mengubah state browser; helper ChatGPT auth tidak dipanggil dan tidak menyediakan kontrak session Supabase. Pemeriksaan publik URL app.cluefy.co melalui browser pencarian tidak berhasil; kesimpulan login production didasarkan konfirmasi user, bukan inspeksi deployment.
+
+Sales kini menyediakan form demo tanpa mengirim/menyimpan credentials. Akses API production ditutup secara default; header spoofing/token dari request tidak dianggap autentikasi. Konfigurasi publishable tidak lagi cukup untuk mengirim request data anonim. Jalur server untuk future adapter memerlukan identitas internal terverifikasi dan meneruskan token user ke Supabase per request tanpa cache lintas-user. Adapter nyata belum tersedia/diimplementasikan; tes menggunakan adapter tiruan dan tidak membuktikan integrasi production.
+
+Persyaratan login demo + tidak ada akses anon + tidak ada service_role belum menyediakan identitas database untuk live SELECT. Database-level read-only juga belum dapat dibuktikan tanpa audit grants/RLS identitas tersebut. Tidak ada perubahan production dibuat. Status yang benar: demo UI dan pengamanan fail-closed siap review, integrasi auth dan data live masih terblokir. Bagian cache 30 detik pada audit awal di atas sudah digantikan pembacaan per-user tanpa shared cache.
+
+Validasi update: enam tes otomatis, sintaks server/frontend, whitespace. Docker tidak tersedia; build/container dan verifikasi Debian/iCentra belum dilakukan. Tidak ada deployment, secrets, perubahan existing atau production.

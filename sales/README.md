@@ -1,20 +1,22 @@
-# ClueFy Sales — review candidate
+# ClueFy Sales — demo UI, production access blocked
 
-Aplikasi terpisah untuk melihat maksimal 100 artikel terbaru yang dapat dibaca oleh role anon di Supabase hosted production. Pencarian hanya atas sampel yang sedang ditampilkan, bukan seluruh database. Ini viewer Sales minimal, bukan seluruh fitur dashboard existing.
+Keputusan user: gunakan login demo existing tanpa membangun authentication/user management baru. Form Sales mengikuti perilaku demo: input email/password hanya membuka tampilan lokal, tidak memverifikasi identitas, tidak mengirim/menyimpan password, dan tidak memberikan izin API. **Ini bukan autentikasi atau pembatas akses internal ZNTX.** Jangan masukkan password sungguhan.
 
-Tidak ada dependency npm, crawler, Postgres, PostgREST lokal, migrasi, RPC, SDK admin, write route, atau fetch isi artikel. Browser hanya membaca API Sales; key berada di server. Server hanya mengirim GET ke satu endpoint tetap dengan proyeksi kolom terbatas. Cache 30 detik dan penggabungan request serentak mengurangi beban. Data teks memakai textContent dan CSP melarang skrip inline.
+Audit mengonfirmasi `app/page.tsx` hanya memanggil setLoggedIn(true), dan docs/operational-features.md menyatakan login tidak mengautentikasi. Helper app/chatgpt-auth.ts tidak digunakan dan header identitas bukan bukti session terpercaya. User mengonfirmasi demo ini yang digunakan app.cluefy.co.
 
-## Batas akses production
+## Status dan batas data
 
-Jangan isi konfigurasi atau jalankan langkah koneksi/deployment sebelum persetujuan user. `.env.example` sengaja kosong. Hanya publishable key atau JWT legacy dengan role anon diterima; signature JWT tetap diverifikasi Supabase. Secret/service_role ditolak. Tidak ada fallback admin atau pemakaian credentials dari dashboard existing.
+Viewer membaca maksimal 100 artikel (judul, excerpt, penerbit, platform, lokasi, waktu; pencarian lokal). Tidak ada crawler, database lokal, PostgREST lokal, mutasi, RPC, atau pengambilan artikel eksternal.
 
-Publishable/anon key **bukan credential read-only secara intrinsik**: izin sebenarnya tetap ditentukan grants/RLS production. Jaminan GET-only di sini berlaku untuk aplikasi Sales ini. Jika anon punya write policy di tempat lain, key yang sama dapat dipakai di luar aplikasi; audit izin existing harus mengonfirmasi kebutuhan organisasi sebelum aktivasi.
+**Akses production sengaja terkunci.** Login demo tidak menghasilkan identitas/JWT untuk RLS. API menolak semua permintaan data secara default (401) dan tidak mengirim query anon ke production, walaupun publishable key dikonfigurasi. Klaim “semua fitur live” atau “database read-only terverifikasi” belum dapat diberikan.
 
-Konteks chat menunjukkan RLS aktif tanpa policy pada crawl_items. Jika masih demikian, respons dapat kosong atau ditolak. Respons kosong tidak membuktikan database kosong atau koneksi live berhasil. Tanpa izin baca yang sudah ada, persyaratan live data + tanpa perubahan policy/schema tidak bisa dipenuhi. Hentikan aktivasi dan minta keputusan user; jangan gunakan service_role untuk mengatasinya.
+Batas integrasi server `authenticate` disiapkan untuk session existing yang terverifikasi: userId, internalZntx dan accessToken. Belum ada adapter production terpasang; CLI selalu memakai deny-by-default. Hanya tes yang menyuntikkan identitas tiruan. Tidak boleh membuat adapter dari form demo, header user/email, atau JWT yang hanya di-decode. Adapter nyata harus memverifikasi session/token, expiry, issuer/audience, dan keanggotaan ZNTX dari sumber terpercaya. Ini bukan sistem login baru dan belum merupakan integrasi auth yang selesai.
 
-## Validasi tanpa production
+Jika suatu hari adapter tersedia, tiap request memakai token user di Authorization bersama public application key dan tunduk RLS; tidak ada shared cache antar-user. Tidak ada fallback anon/admin. Key secret/service_role ditolak. Proyeksi endpoint tetap, timeout 8 detik, redirect ditolak, error disanitasi dan CSP/textContent melindungi rendering.
 
-Dari root repo:
+Publishable key bukan izin database read-only. Sebelum aktivasi harus dibuktikan grants/RLS membolehkan hanya SELECT yang dibutuhkan dan menolak mutasi serta RPC berefek tulis untuk identitas Sales, termasuk lewat API langsung. Bila identitas authenticated existing dapat menulis, token itu tidak memenuhi persyaratan Sales. Jangan revoke hak authenticated secara global karena dapat merusak existing. Tidak ada policy/schema/grants production diubah pada pekerjaan ini.
+
+## Validasi
 
 ```sh
 node --test sales/tests/*.test.mjs
@@ -24,16 +26,16 @@ docker compose -f sales/compose.yaml config --quiet
 docker build -t cluefy-sales:review sales
 ```
 
-Tes memakai fetch tiruan dan port loopback sementara, tanpa koneksi production. Workflow Sales hanya validasi PR, tanpa secrets, publish, atau deploy. Workflow existing tetap ada; membuat PR juga dapat memicu Docker smoke existing (database lokal di runner CI), jadi review sebelum push/PR. Tidak ada PR/push dilakukan pada pekerjaan ini.
+Enam tes menggunakan loopback dan upstream tiruan, tanpa production/secrets. Docker belum tersedia di lingkungan development; Compose/build/smoke container belum dijalankan. Workflow PR Sales mengetes dan build saja, tanpa deploy/secrets. Workflow existing tetap dapat berjalan sesuai trigger-nya.
 
-## Rencana Debian SETELAH persetujuan
+## Debian: hanya setelah persetujuan deployment
 
-1. Periksa `docker compose ls`, container/volume/network existing, kapasitas RAM/disk, dan `ss -ltn` untuk memastikan 3117 bebas. Ini belum diperiksa pada host Debian/iCentra.
-2. Tempatkan hanya folder sales di direktori baru, misalnya `/opt/cluefy-sales`; jangan timpa checkout, Compose, environment, proxy, network, atau volume ClueFy/iCentra. Gunakan project name `cluefy-sales` yang unik; jangan override dengan nama project existing.
-3. User memasukkan URL production dan publishable/anon key yang disetujui ke file konfigurasi Sales sendiri dengan izin file 600. Jangan salin `.env` existing. Jangan commit file tersebut.
-4. Validasi konfigurasi dengan `config --quiet` (hindari mencetak konfigurasi berisi key), lalu build image Sales. Setelah persetujuan deployment, jalankan hanya Compose Sales dengan file konfigurasi eksplisit. Tidak ada volumes/shared network/host network/container_name.
-5. Port default `127.0.0.1:3117`; akses lewat SSH tunnel. Jangan buka ke internet tanpa autentikasi yang disetujui. Tidak ada user login di viewer ini. Jangan mengubah reverse proxy existing pada tahap ini.
-6. Periksa `/healthz` untuk proses (bukan bukti akses DB), lalu `/api/items` untuk koneksi dengan GET. Cocokkan sampel yang diizinkan bersama pemilik data. Jangan melakukan percobaan INSERT/PATCH/DELETE terhadap production untuk menguji read-only.
-7. Pantau resource dan health iCentra/ClueFy sebelum/sesudah. Rollback hanya `docker compose -p cluefy-sales -f /opt/cluefy-sales/compose.yaml down` dengan file environment Sales bila diperlukan. Jangan gunakan `down -v`, prune, atau stop layanan existing.
+1. Periksa kapasitas, container/network/volume existing, dan port 3117 (`ss -ltn`). Jangan menyentuh ClueFy existing atau iCentra.
+2. Tempatkan folder sales dalam direktori baru `/opt/cluefy-sales`. Compose memakai project unik cluefy-sales, satu container non-root, tanpa volume/network external, resource limit dan filesystem read-only.
+3. Build dan jalankan hanya `sales/compose.yaml`; jangan root Compose. Port tetap loopback `127.0.0.1:3117`; gunakan SSH tunnel. Login demo bukan alasan membuka service ke internet.
+4. Untuk review demo biarkan konfigurasi Supabase kosong; healthz membuktikan proses sehat, bukan koneksi data. API akan tetap 401, termasuk setelah demo login.
+5. Jangan isi secrets atau mengaktifkan data sebelum jalur identity + database read-only diselesaikan dan disetujui. Gunakan konfigurasi terpisah berizin 600, tidak menyalin .env existing. Jangan mencetak config berisi key.
+6. Sesudah jalur tersebut disetujui, uji baca sampel production dengan GET dan inspeksi grants/RLS secara read-only. Jangan mencoba mutasi terhadap production untuk validasi.
+7. Rollback hanya project Sales dengan `docker compose -p cluefy-sales -f /opt/cluefy-sales/compose.yaml down` (sertakan environment Sales bila diperlukan). Jangan prune, down -v, atau stop existing.
 
-Dockerfile hanya menyalin server dan assets dari build context Sales yang di-allowlist. Container berjalan sebagai non-root, filesystem read-only, capability dibuang, dan resource dibatasi. Base image belum dipin digest; pin digest yang disetujui setelah build dan scan sebelum deploy.
+Build context Docker hanya allowlist server/assets; tidak membawa secrets, worker, atau migration. Tidak ada deployment dilakukan. Base image belum dipin digest/discan. Tampilan demo tidak menyelesaikan persyaratan keamanan level database; jangan mengiklankan kandidat ini sebagai siap production.

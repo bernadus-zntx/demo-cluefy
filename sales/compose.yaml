@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     init: true
     ports:
-      - "127.0.0.1:${CLUEFY_SALES_PORT:-3117}:3000"
+      - "127.0.0.1:3117:3000"
     environment:
       SALES_SUPABASE_URL: ${SALES_SUPABASE_URL:-}
       SALES_SUPABASE_KEY: ${SALES_SUPABASE_KEY:-}
